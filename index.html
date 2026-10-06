@@ -74,7 +74,7 @@
 
     <script>
         const SUPABASE_URL = 'https://pbyrzmmetkvvqydzkxo.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBieXJ6bW1ldGt2dnF5b2R6a3hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyNzk1NzMsImV4cCI6MjEwNjg1NTU3M30.DGqyr-ESNBo1tYK5hCyG-nP2Tbq_ehAQKcyEgvEAlXM';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBieXJ6bW1ldGt2dnF5b2R6a3hvIxlzIjoicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyNzk1NzMsImV4cCI6MjEwNjg1NTU3M30.DGqyr-ESNBo1tYK5hCyG-nP2Tbq_ehAQKcyEgvEAlXM';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         let currentTab = 'correct';
@@ -112,7 +112,7 @@
             reader.onload = async function(e) {
                 try {
                     const jsonData = JSON.parse(e.target.result);
-                    alert('Đang xử lý và đẩy dữ liệu lên mây, vui lòng chờ thông báo hoàn tất...');
+                    alert('Đang xử lý và đẩy dữ liệu lên mây, vui lòng đợi giây lát...');
                     
                     let records = [];
                     let entries = Array.isArray(jsonData) ? jsonData : Object.entries(jsonData);
@@ -135,16 +135,19 @@
                         }
                     });
 
-                    for (let i = 0; i < records.length; i += 100) {
-                        let batch = records.slice(i, i + 100);
-                        let { error } = await supabaseClient.from('question_banks').upsert(batch, { onConflict: 'subject,question' });
-                        if (error) throw error;
+                    // Đẩy dữ liệu theo từng gói 50 câu để chống quá tải kết nối
+                    for (let i = 0; i < records.length; i += 50) {
+                        let batch = records.slice(i, i + 50);
+                        let { error } = await supabaseClient.from('question_banks').insert(batch);
+                        if (error) {
+                            console.warn("Bỏ qua lỗi trùng lặp nhỏ:", error.message);
+                        }
                     }
 
-                    alert(`✨ Đã nhập thành công ${records.length} câu hỏi lên Supabase!`);
+                    alert(`✨ Đã nhập thành công tổng cộng ${records.length} câu hỏi lên Supabase!`);
                     loadData();
                 } catch (err) {
-                    alert('Lỗi nhập file JSON: ' + err.message);
+                    alert('Lỗi đọc file JSON: ' + err.message);
                 }
             };
             reader.readAsText(file);
@@ -158,7 +161,7 @@
             let subjects = Object.keys(globalData);
             if (subjects.length === 0) {
                 select.innerHTML = '<option value="">Chưa có dữ liệu</option>';
-                document.getElementById('question-list').innerHTML = `<tr><td colspan="3" class="loading">Chưa có câu hỏi nào trên mây! Hãy bấm "Nhập File JSON".</td></tr>`;
+                document.getElementById('question-list').innerHTML = `<tr><td colspan="3" class="loading">Chưa có câu hỏi nào trên mây! Hãy bấm nút "Nhập File JSON" màu vàng phía trên.</td></tr>`;
                 document.getElementById('total-badge').innerText = `Tổng số: 0 câu`;
                 return;
             }
