@@ -135,7 +135,6 @@
                         }
                     });
 
-                    // Chia nhỏ từng batch 100 câu để đẩy lên mây siêu mượt
                     for (let i = 0; i < records.length; i += 100) {
                         let batch = records.slice(i, i + 100);
                         let { error } = await supabaseClient.from('question_banks').upsert(batch, { onConflict: 'subject,question' });
