@@ -8,7 +8,7 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 1200px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h1 { color: #0056b3; margin-top: 0; display: flex; justify-content: space-between; align-items: center; }
+        h1 { color: #0056b3; margin-top: 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; background: #f8f9fa; padding: 15px; border-radius: 8px; }
         select, button { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; cursor: pointer; }
         button { background: #0056b3; color: white; border: none; }
@@ -17,6 +17,8 @@
         .btn-danger:hover { background: #bd2130; }
         .btn-success { background: #28a745; }
         .btn-success:hover { background: #218838; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-warning:hover { background: #e0a800; }
         .tab-container { display: flex; gap: 5px; }
         .tab-btn { background: #e9ecef; color: #495057; border: none; }
         .tab-btn.active-correct { background: #0056b3; color: white; }
@@ -32,11 +34,15 @@
     <div class="container">
         <h1>
             📚 HOU LMS Cloud Study Hub
-            <span id="total-badge" style="font-size: 14px; background: #e2e8f0; color: #2d3748; padding: 4px 10px; border-radius: 20px;">Đang kết nối...</span>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="file" id="json-file-input" style="display: none;" accept=".json" onchange="importJSON(event)">
+                <button class="btn-warning" onclick="document.getElementById('json-file-input').click()">📥 Nhập File JSON (1000+ câu)</button>
+                <span id="total-badge" style="font-size: 14px; background: #e2e8f0; color: #2d3748; padding: 4px 10px; border-radius: 20px;">Đang kết nối...</span>
+            </div>
         </h1>
 
         <div class="controls">
-            <div style="display: flex; gap: 10px; align-items: center;">
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <label><b>Chọn môn:</b></label>
                 <select id="subject-select" style="min-width: 200px;"></select>
                 <div class="tab-container">
@@ -75,25 +81,71 @@
         let globalData = {};
 
         async function loadData() {
-            let { data, error } = await supabaseClient.from('question_banks').select('*');
-            if (error) {
-                alert('Lỗi tải dữ liệu: ' + error.message);
-                return;
-            }
-
-            globalData = {};
-            data.forEach(item => {
-                if (!globalData[item.subject]) {
-                    globalData[item.subject] = { correct: {}, wrong: {} };
+            try {
+                let { data, error } = await supabaseClient.from('question_banks').select('*');
+                if (error) {
+                    throw error;
                 }
-                let status = item.status || 'correct';
-                globalData[item.subject][status][item.question] = {
-                    correct: item.correct_answer,
-                    options: item.options
-                };
-            });
 
-            updateSubjectDropdown();
+                globalData = {};
+                (data || []).forEach(item => {
+                    if (!globalData[item.subject]) {
+                        globalData[item.subject] = { correct: {}, wrong: {} };
+                    }
+                    let status = item.status || 'correct';
+                    globalData[item.subject][status][item.question] = {
+                        correct: item.correct_answer,
+                        options: item.options
+                    };
+                });
+
+                updateSubjectDropdown();
+            } catch (err) {
+                document.getElementById('question-list').innerHTML = `<tr><td colspan="3" class="loading" style="color:red;">Lỗi kết nối Supabase: ${err.message}</td></tr>`;
+                document.getElementById('total-badge').innerText = 'Lỗi kết nối';
+            }
+        }
+
+        async function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const jsonData = JSON.parse(e.target.result);
+                    alert('Đang tiến hành đẩy dữ liệu lên mây, vui lòng chờ trong giây lát...');
+                    
+                    let count = 0;
+                    // Hỗ trợ mảng hoặc object tùy cấu trúc file JSON cũ của bạn
+                    let entries = Array.isArray(jsonData) ? jsonData : Object.entries(jsonData);
+
+                    for (let item of entries) {
+                        // Nếu file JSON cũ lưu theo dạng cấu trúc tùy biến, bạn có thể map lại ở đây
+                        let sub = item.subject || "Môn học chung";
+                        let q = item.question || item[0];
+                        let ans = item.correct_answer || item[1]?.correct;
+                        let opts = item.options || item[1]?.options || [];
+
+                        if (q && ans) {
+                            await supabaseClient.from('question_banks').upsert({
+                                subject: sub,
+                                question: q,
+                                correct_answer: ans,
+                                options: opts,
+                                status: 'correct',
+                                updated_at: new Date().toISOString()
+                            }, { onConflict: 'subject,question' });
+                            count++;
+                        }
+                    }
+                    alert(`✨ Đã nhập thành công ${count} câu hỏi lên Supabase!`);
+                    loadData();
+                } catch (err) {
+                    alert('Lỗi đọc file JSON: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
         }
 
         function updateSubjectDropdown() {
@@ -104,7 +156,7 @@
             let subjects = Object.keys(globalData);
             if (subjects.length === 0) {
                 select.innerHTML = '<option value="">Chưa có dữ liệu</option>';
-                document.getElementById('question-list').innerHTML = `<tr><td colspan="3" class="loading">Chưa có câu hỏi nào trên mây!</td></tr>`;
+                document.getElementById('question-list').innerHTML = `<tr><td colspan="3" class="loading">Chưa có câu hỏi nào trên mây! Bạn có thể dùng nút "Nhập File JSON" phía trên.</td></tr>`;
                 document.getElementById('total-badge').innerText = `Tổng số: 0 câu`;
                 return;
             }
