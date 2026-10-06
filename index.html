@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HOU LMS Study Hub - Quản Lý Kho Câu Hỏi</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: #0056b3; margin-top: 0; display: flex; justify-content: space-between; align-items: center; }
+        .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; background: #f8f9fa; padding: 15px; border-radius: 8px; }
+        select, button { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; cursor: pointer; }
+        button { background: #0056b3; color: white; border: none; }
+        button:hover { background: #004085; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #bd2130; }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #218838; }
+        .tab-container { display: flex; gap: 5px; }
+        .tab-btn { background: #e9ecef; color: #495057; border: none; }
+        .tab-btn.active-correct { background: #0056b3; color: white; }
+        .tab-btn.active-wrong { background: #dc3545; color: white; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        th { background: #0056b3; color: white; }
+        tr:nth-child(even) { background: #f9f9f9; }
+        .loading { text-align: center; padding: 30px; font-weight: bold; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            📚 HOU LMS Cloud Study Hub
+            <span id="total-badge" style="font-size: 14px; background: #e2e8f0; color: #2d3748; padding: 4px 10px; border-radius: 20px;">Đang kết nối...</span>
+        </h1>
+
+        <div class="controls">
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <label><b>Chọn môn:</b></label>
+                <select id="subject-select" style="min-width: 200px;"></select>
+                <div class="tab-container">
+                    <button id="btn-tab-correct" class="tab-btn active-correct" onclick="switchTab('correct')">✅ Kho Đúng</button>
+                    <button id="btn-tab-wrong" class="tab-btn" onclick="switchTab('wrong')">❌ Kho Sai</button>
+                </div>
+            </div>
+            <div>
+                <button class="btn-success" onclick="exportWord()">📝 Xuất Word Môn</button>
+                <button class="btn-danger" onclick="deleteSubject()">🗑️ Xóa Môn Này</button>
+            </div>
+        </div>
+
+        <div id="content-area">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 50%;">Câu hỏi</th>
+                        <th style="width: 40%;">Đáp án / Lựa chọn</th>
+                        <th style="width: 10%; text-align: center;">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody id="question-list">
+                    <tr><td colspan="3" class="loading">Đang tải dữ liệu từ Supabase...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://pbyrzmmetkvvqydzkxo.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBieXJ6bW1ldGt2dnF5b2R6a3hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyNzk1NzMsImV4cCI6MjEwNjg1NTU3M30.DGqyr-ESNBo1tYK5hCyG-nP2Tbq_ehAQKcyEgvEAlXM';
+        
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let currentTab = 'correct';
+        let globalData = {};
+
+        async function loadData() {
+            let { data, error } = await supabaseClient.from('question_banks').select('*');
+            if (error) {
+                alert('Lỗi tải dữ liệu: ' + error.message);
+                return;
+            }
+
+            globalData = {};
+            data.forEach(item => {
+                if (!globalData[item.subject]) {
+                    globalData[item.subject] = { correct: {}, wrong: {} };
+                }
+                let status = item.status || 'correct';
+                globalData[item.subject][status][item.question] = {
+                    correct: item.correct_answer,
+                    options: item.options
+                };
+            });
+
+            updateSubjectDropdown();
+        }
+
+        function updateSubjectDropdown() {
+            const select = document.getElementById('subject-select');
+            let currentVal = select.value;
+            select.innerHTML = '';
+
+            let subjects = Object.keys(globalData);
+            if (subjects.length === 0) {
+                select.innerHTML = '<option value="">Chưa có dữ liệu</option>';
+                document.getElementById('question-list').innerHTML = `<tr><td colspan="3" class="loading">Chưa có câu hỏi nào trên mây!</td></tr>`;
+                document.getElementById('total-badge').innerText = `Tổng số: 0 câu`;
+                return;
+            }
+
+            subjects.forEach(sub => {
+                let count = Object.keys(globalData[sub].correct || {}).length + Object.keys(globalData[sub].wrong || {}).length;
+                let opt = document.createElement('option');
+                opt.value = sub;
+                opt.innerText = `${sub} (${count} câu)`;
+                select.appendChild(opt);
+            });
+
+            if (currentVal && subjects.includes(currentVal)) {
+                select.value = currentVal;
+            }
+            renderTable();
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            if (tab === 'correct') {
+                document.getElementById('btn-tab-correct').className = 'tab-btn active-correct';
+                document.getElementById('btn-tab-wrong').className = 'tab-btn';
+            } else {
+                document.getElementById('btn-tab-correct').className = 'tab-btn';
+                document.getElementById('btn-tab-wrong').className = 'tab-btn active-wrong';
+            }
+            renderTable();
+        }
+
+        function renderTable() {
+            const select = document.getElementById('subject-select');
+            const sub = select.value;
+            const tbody = document.getElementById('question-list');
+            tbody.innerHTML = '';
+
+            if (!sub || !globalData[sub]) {
+                tbody.innerHTML = `<tr><td colspan="3" class="loading">Không có dữ liệu cho môn này!</td></tr>`;
+                return;
+            }
+
+            let targetList = globalData[sub][currentTab] || {};
+            let keys = Object.keys(targetList);
+
+            let totalCorrect = Object.keys(globalData[sub].correct || {}).length;
+            let totalWrong = Object.keys(globalData[sub].wrong || {}).length;
+            document.getElementById('total-badge').innerText = `📖 ${sub} | Đúng: ${totalCorrect} | Sai: ${totalWrong}`;
+
+            if (keys.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="loading">${currentTab === 'correct' ? 'Kho Đúng' : 'Kho Sai'} trống!</td></tr>`;
+                return;
+            }
+
+            keys.forEach(q => {
+                let item = targetList[q];
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${q}</td>
+                    <td><b>Đáp án:</b> <span style="color: ${currentTab === 'correct' ? '#28a745' : '#dc3545'};">${item.correct}</span><br><small style="color:#666;">Các lựa chọn: ${item.options ? item.options.join(', ') : ''}</small></td>
+                    <td style="text-align: center;">
+                        <button class="btn-danger" style="padding: 5px 8px; font-size: 12px;" onclick="deleteQuestion('${sub}', '${q.replace(/'/g, "\\'")}')">Xóa</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.getElementById('subject-select').onchange = renderTable;
+
+        async function deleteQuestion(sub, q) {
+            if (confirm('Bạn có chắc muốn xóa câu hỏi này?')) {
+                await supabaseClient.from('question_banks').delete().eq('subject', sub).eq('question', q);
+                loadData();
+            }
+        }
+
+        async function deleteSubject() {
+            const sub = document.getElementById('subject-select').value;
+            if (!sub) return;
+            if (confirm(`Xóa toàn bộ dữ liệu môn [${sub}] trên mây?`)) {
+                await supabaseClient.from('question_banks').delete().eq('subject', sub);
+                loadData();
+            }
+        }
+
+        function exportWord() {
+            const sub = document.getElementById('subject-select').value;
+            if (!sub || !globalData[sub]) return;
+            let correctList = globalData[sub].correct || {};
+            let keys = Object.keys(correctList);
+            if (keys.length === 0) {
+                alert('Kho Đúng của môn này đang trống để xuất Word!');
+                return;
+            }
+
+            let html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+            <head><meta charset='utf-8'><title>${sub}</title></head>
+            <body style="font-family:'Times New Roman'; font-size:14pt;">
+            <h1 style="text-align:center; color:#0056b3;">ĐÁP ÁN MÔN: ${sub.toUpperCase()}</h1>`;
+
+            keys.forEach((q, idx) => {
+                html += `<div style="margin-bottom:15px;"><b>Câu ${idx+1}:</b> ${q}<br><span style="color:green; font-weight:bold;">👉 Đáp án: ${correctList[q].correct}</span></div>`;
+            });
+            html += `</body></html>`;
+
+            let blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = `Bo_Dap_An_${sub.replace(/\s+/g, '_')}.doc`;
+            a.click();
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
