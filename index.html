@@ -83,9 +83,7 @@
         async function loadData() {
             try {
                 let { data, error } = await supabaseClient.from('question_banks').select('*');
-                if (error) {
-                    throw error;
-                }
+                if (error) throw error;
 
                 globalData = {};
                 (data || []).forEach(item => {
@@ -114,35 +112,40 @@
             reader.onload = async function(e) {
                 try {
                     const jsonData = JSON.parse(e.target.result);
-                    alert('Đang tiến hành đẩy dữ liệu lên mây, vui lòng chờ trong giây lát...');
+                    alert('Đang xử lý và đẩy dữ liệu lên mây, vui lòng chờ thông báo hoàn tất...');
                     
-                    let count = 0;
-                    // Hỗ trợ mảng hoặc object tùy cấu trúc file JSON cũ của bạn
+                    let records = [];
                     let entries = Array.isArray(jsonData) ? jsonData : Object.entries(jsonData);
 
-                    for (let item of entries) {
-                        // Nếu file JSON cũ lưu theo dạng cấu trúc tùy biến, bạn có thể map lại ở đây
+                    entries.forEach(item => {
                         let sub = item.subject || "Môn học chung";
                         let q = item.question || item[0];
                         let ans = item.correct_answer || item[1]?.correct;
                         let opts = item.options || item[1]?.options || [];
 
                         if (q && ans) {
-                            await supabaseClient.from('question_banks').upsert({
+                            records.push({
                                 subject: sub,
                                 question: q,
                                 correct_answer: ans,
                                 options: opts,
                                 status: 'correct',
                                 updated_at: new Date().toISOString()
-                            }, { onConflict: 'subject,question' });
-                            count++;
+                            });
                         }
+                    });
+
+                    // Chia nhỏ từng batch 100 câu để đẩy lên mây siêu mượt
+                    for (let i = 0; i < records.length; i += 100) {
+                        let batch = records.slice(i, i + 100);
+                        let { error } = await supabaseClient.from('question_banks').upsert(batch, { onConflict: 'subject,question' });
+                        if (error) throw error;
                     }
-                    alert(`✨ Đã nhập thành công ${count} câu hỏi lên Supabase!`);
+
+                    alert(`✨ Đã nhập thành công ${records.length} câu hỏi lên Supabase!`);
                     loadData();
                 } catch (err) {
-                    alert('Lỗi đọc file JSON: ' + err.message);
+                    alert('Lỗi nhập file JSON: ' + err.message);
                 }
             };
             reader.readAsText(file);
@@ -156,7 +159,7 @@
             let subjects = Object.keys(globalData);
             if (subjects.length === 0) {
                 select.innerHTML = '<option value="">Chưa có dữ liệu</option>';
-                document.getElementById('question-list').innerHTML = `<tr><td colspan="3" class="loading">Chưa có câu hỏi nào trên mây! Bạn có thể dùng nút "Nhập File JSON" phía trên.</td></tr>`;
+                document.getElementById('question-list').innerHTML = `<tr><td colspan="3" class="loading">Chưa có câu hỏi nào trên mây! Hãy bấm "Nhập File JSON".</td></tr>`;
                 document.getElementById('total-badge').innerText = `Tổng số: 0 câu`;
                 return;
             }
