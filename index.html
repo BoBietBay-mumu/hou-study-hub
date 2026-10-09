@@ -38,7 +38,6 @@
         .btn-success { background: var(--success); }
         .btn-warning { background: var(--warning); color: #333; }
         
-        /* Hiệu ứng active cho nút Kho Đúng / Kho Sai */
         .tab-btn-filter { opacity: 0.5; border: 2px solid transparent; transition: all 0.2s; }
         .tab-btn-filter.active-tab { opacity: 1; border: 2px solid #000; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
 
@@ -74,7 +73,7 @@
             </div>
 
             <div id="subject-directory">
-                <div class="loading">Đang tải toàn bộ dữ liệu từ mây...</div>
+                <div class="loading">Đang tải dữ liệu tốc độ cao...</div>
             </div>
 
             <div id="question-workspace" style="display: none; margin-top: 20px;">
@@ -147,25 +146,12 @@
         async function loadData() {
             document.getElementById('total-badge').innerText = 'Đang đồng bộ...';
             try {
-                let allData = [];
-                let step = 1000;
-                let from = 0;
-                let fetchMore = true;
-
-                while (fetchMore) {
-                    let { data, error } = await supabaseClient.from('question_banks').select('*').range(from, from + step - 1);
-                    if (error) throw error;
-                    if (data && data.length > 0) {
-                        allData = allData.concat(data);
-                        from += step;
-                        if (data.length < step) fetchMore = false;
-                    } else {
-                        fetchMore = false;
-                    }
-                }
+                // Tải nhanh gọn trong 1 request tối đa 2000 câu
+                let { data, error } = await supabaseClient.from('question_banks').select('*').range(0, 1999);
+                if (error) throw error;
 
                 globalData = {};
-                allData.forEach(item => {
+                (data || []).forEach(item => {
                     let subName = (item.subject || "Chung").trim();
                     if (!globalData[subName]) {
                         globalData[subName] = { correct: {}, wrong: {} };
@@ -188,7 +174,7 @@
 
                 renderDirectory();
                 loadDeadlines();
-                document.getElementById('total-badge').innerText = `Đã tải ${allData.length} câu (Mây OK)!`;
+                document.getElementById('total-badge').innerText = `Đã tải ${(data || []).length} câu (Mây OK)!`;
             } catch (err) {
                 console.error("Lỗi load data:", err);
                 document.getElementById('total-badge').innerText = 'Lỗi kết nối';
@@ -464,7 +450,7 @@
             });
             html += `</body></html>`;
 
-            let blob = new Blob(['\ufeff' + html], { type: 'application/msword'}}, { type: 'application/msword' });
+            let blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
             let url = URL.createObjectURL(blob);
             let a = document.createElement('a');
             a.href = url;
