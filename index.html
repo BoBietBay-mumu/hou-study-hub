@@ -55,7 +55,7 @@
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <input type="file" id="json-file-input" style="display: none;" accept=".json" onchange="importJSON(event)">
                 <button class="btn-warning" onclick="document.getElementById('json-file-input').click()">📥 Nhập JSON</button>
-                <button class="btn-success" onclick="loadData()" style="padding: 6px 10px; font-size: 12px;">🔄 Tải Lại</button>
+                <button class="btn-success" onclick="loadDirectory()" style="padding: 6px 10px; font-size: 12px;">🔄 Tải Lại</button>
                 <span id="total-badge" style="font-size: 14px; background: #e2e8f0; color: #2d3748; padding: 4px 10px; border-radius: 20px;">Đang kết nối mây...</span>
             </div>
         </h1>
@@ -73,7 +73,7 @@
             </div>
 
             <div id="subject-directory">
-                <div class="loading">Đang tải dữ liệu tốc độ cao...</div>
+                <div class="loading">Đang tải danh sách môn học siêu tốc...</div>
             </div>
 
             <div id="question-workspace" style="display: none; margin-top: 20px;">
@@ -101,7 +101,9 @@
                             <th style="width: 10%; text-align: center;">Thao tác</th>
                         </tr>
                     </thead>
-                    <tbody id="question-list"></tbody>
+                    <tbody id="question-list">
+                        <tr><td colspan="4" class="loading">Đang tải câu hỏi của môn...</td></tr>
+                    </tbody>
                 </table>
             </div>
         </div>
@@ -137,48 +139,37 @@
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         
-        let globalData = {};
+        let subjectStats = {}; // Chỉ chứa tên môn và số lượng câu hỏi
+        let activeSubjectData = { correct: {}, wrong: {} }; // Chỉ tải chi tiết khi click vào môn
         let activeSubject = '';
         let currentQuestionTab = 'correct';
         let semesters = JSON.parse(localStorage.getItem('hou_semesters') || '["Kỳ 1", "Kỳ 2", "Kỳ 3"]');
         let subjectSemesterMap = JSON.parse(localStorage.getItem('hou_subject_map') || '{}');
 
-        async function loadData() {
+        async function loadDirectory() {
             document.getElementById('total-badge').innerText = 'Đang đồng bộ...';
             try {
-                // Tải tốc độ cao với dải rộng lên đến 5000 câu
-                let { data, error } = await supabaseClient
-                    .from('question_banks')
-                    .select('*')
-                    .range(0, 4999);
-                
+                // Chỉ lấy cột subject và status để đếm siêu nhanh, không tải thô toàn bộ câu hỏi
+                let { data, error } = await supabaseClient.from('question_banks').select('subject, status').range(0, 9999);
                 if (error) throw error;
 
-                globalData = {};
+                subjectStats = {};
                 (data || []).forEach(item => {
                     let subName = (item.subject || "Chung").trim();
-                    if (!globalData[subName]) {
-                        globalData[subName] = { correct: {}, wrong: {} };
+                    if (!subjectStats[subName]) {
+                        subjectStats[subName] = { correct: 0, wrong: 0 };
                     }
                     let status = item.status && item.status.trim() !== '' ? item.status.trim() : 'correct';
-                    let opts = item.options;
-                    if (typeof opts === 'string') {
-                        try { opts = JSON.parse(opts); } catch(e) { opts = []; }
+                    if (status === 'wrong') {
+                        subjectStats[subName].wrong++;
+                    } else {
+                        subjectStats[subName].correct++;
                     }
-                    
-                    let qKey = item.question;
-                    if (globalData[subName][status][qKey]) {
-                        qKey = `${item.question} [Đáp án: ${item.correct_answer}]`;
-                    }
-                    globalData[subName][status][qKey] = {
-                        correct: item.correct_answer,
-                        options: Array.isArray(opts) ? opts : []
-                    };
                 });
 
                 renderDirectory();
                 loadDeadlines();
-                document.getElementById('total-badge').innerText = `Đã tải tổng cộng ${(data || []).length} câu!`;
+                document.getElementById('total-badge').innerText = `Kết nối mây thành công!`;
             } catch (err) {
                 console.error("Lỗi load data:", err);
                 document.getElementById('total-badge').innerText = 'Lỗi kết nối';
@@ -219,7 +210,7 @@
             const container = document.getElementById('subject-directory');
             container.innerHTML = '';
 
-            let subjects = Object.keys(globalData);
+            let subjects = Object.keys(subjectStats);
             if (subjects.length === 0) {
                 container.innerHTML = `<div class="loading">Chưa có dữ liệu câu hỏi nào trên mây!</div>`;
                 return;
@@ -230,9 +221,8 @@
             let unassigned = [];
 
             subjects.forEach(sub => {
-                let correctCount = Object.keys(globalData[sub].correct || {}).length;
-                let wrongCount = Object.keys(globalData[sub].wrong || {}).length;
-                let totalCount = correctCount + wrongCount;
+                let stats = subjectStats[sub];
+                let totalCount = stats.correct + stats.wrong;
 
                 let sem = subjectSemesterMap[sub];
                 if (sem && grouped[sem]) {
@@ -278,14 +268,48 @@
             }
         }
 
-        function openSubject(subName) {
+        // Khi bấm vào môn nào, chỉ tải dữ liệu của đúng môn đó lên
+        async function openSubject(subName) {
             activeSubject = subName;
             currentQuestionTab = 'correct';
             document.getElementById('subject-directory').style.display = 'none';
             document.getElementById('question-workspace').style.display = 'block';
             document.getElementById('active-subject-title').innerText = `📖 Môn: ${subName}`;
+            document.getElementById('question-list').innerHTML = `<tr><td colspan="4" class="loading">Đang tải chi tiết câu hỏi...</td></tr>`;
+            
             updateTabButtonUI();
-            renderQuestionsTable();
+
+            try {
+                let { data, error } = await supabaseClient
+                    .from('question_banks')
+                    .select('*')
+                    .eq('subject', subName);
+
+                if (error) throw error;
+
+                activeSubjectData = { correct: {}, wrong: {} };
+                (data || []).forEach(item => {
+                    let status = item.status && item.status.trim() !== '' ? item.status.trim() : 'correct';
+                    let opts = item.options;
+                    if (typeof opts === 'string') {
+                        try { opts = JSON.parse(opts); } catch(e) { opts = []; }
+                    }
+                    
+                    let qKey = item.question;
+                    if (activeSubjectData[status][qKey]) {
+                        qKey = `${item.question} [Đáp án: ${item.correct_answer}]`;
+                    }
+                    activeSubjectData[status][qKey] = {
+                        correct: item.correct_answer,
+                        options: Array.isArray(opts) ? opts : []
+                    };
+                });
+
+                renderQuestionsTable();
+            } catch (err) {
+                console.error("Lỗi tải chi tiết môn:", err);
+                document.getElementById('question-list').innerHTML = `<tr><td colspan="4" class="loading" style="color:red;">Lỗi tải dữ liệu môn này!</td></tr>`;
+            }
         }
 
         function backToDirectory() {
@@ -315,9 +339,7 @@
             const tbody = document.getElementById('question-list');
             tbody.innerHTML = '';
 
-            if (!activeSubject || !globalData[activeSubject]) return;
-
-            let targetList = globalData[activeSubject][currentQuestionTab] || {};
+            let targetList = activeSubjectData[currentQuestionTab] || {};
             let keys = Object.keys(targetList);
 
             if (keys.length === 0) {
@@ -347,7 +369,7 @@
             if (confirm('Xóa câu hỏi này khỏi mây chung?')) {
                 let cleanQ = q.includes(' [') ? q.split(' [')[0] : q;
                 await supabaseClient.from('question_banks').delete().eq('subject', sub).eq('question', cleanQ);
-                loadData().then(() => openSubject(sub));
+                openSubject(sub);
             }
         }
 
@@ -356,7 +378,7 @@
             if (confirm(`Xóa toàn bộ dữ liệu môn [${activeSubject}] trên mây chung?`)) {
                 await supabaseClient.from('question_banks').delete().eq('subject', activeSubject);
                 backToDirectory();
-                loadData();
+                loadDirectory();
             }
         }
 
@@ -417,15 +439,14 @@
                         await supabaseClient.from('question_banks').upsert(records.slice(i, i + 50), { onConflict: 'subject,question' });
                     }
                     alert('✨ Nhập dữ liệu thành công!');
-                    loadData();
+                    loadDirectory();
                 } catch (err) { alert('Lỗi: ' + err.message); }
             };
             reader.readAsText(file);
         }
 
         function exportWord() {
-            if (!activeSubject || !globalData[activeSubject]) return;
-            let correctList = Object.assign({}, globalData[activeSubject].correct || {}, globalData[activeSubject].wrong || {});
+            let correctList = Object.assign({}, activeSubjectData.correct || {}, activeSubjectData.wrong || {});
             let keys = Object.keys(correctList);
             if (keys.length === 0) { alert('Kho trống!'); return; }
 
@@ -462,7 +483,7 @@
             a.click();
         }
 
-        loadData();
+        loadDirectory();
     </script>
 </body>
 </html>
