@@ -146,8 +146,12 @@
         async function loadData() {
             document.getElementById('total-badge').innerText = 'Đang đồng bộ...';
             try {
-                // Tải nhanh gọn trong 1 request tối đa 2000 câu
-                let { data, error } = await supabaseClient.from('question_banks').select('*').range(0, 1999);
+                // Tải tốc độ cao với dải rộng lên đến 5000 câu
+                let { data, error } = await supabaseClient
+                    .from('question_banks')
+                    .select('*')
+                    .range(0, 4999);
+                
                 if (error) throw error;
 
                 globalData = {};
@@ -174,7 +178,7 @@
 
                 renderDirectory();
                 loadDeadlines();
-                document.getElementById('total-badge').innerText = `Đã tải ${(data || []).length} câu (Mây OK)!`;
+                document.getElementById('total-badge').innerText = `Đã tải tổng cộng ${(data || []).length} câu!`;
             } catch (err) {
                 console.error("Lỗi load data:", err);
                 document.getElementById('total-badge').innerText = 'Lỗi kết nối';
