@@ -64,13 +64,14 @@
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 50%;">Câu hỏi</th>
+                        <th style="width: 5%; text-align: center;">STT</th>
+                        <th style="width: 45%;">Câu hỏi</th>
                         <th style="width: 40%;">Đáp án / Lựa chọn</th>
                         <th style="width: 10%; text-align: center;">Thao tác</th>
                     </tr>
                 </thead>
                 <tbody id="question-list">
-                    <tr><td colspan="3" class="loading">Đang tải dữ liệu từ Supabase...</td></tr>
+                    <tr><td colspan="4" class="loading">Đang tải dữ liệu từ Supabase...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -100,10 +101,10 @@
                     if (typeof opts === 'string') {
                         try { opts = JSON.parse(opts); } catch(e) { opts = []; }
                     }
-                    // Đảm bảo không bị ghi đè nếu trùng câu nhưng khác đáp án
+                    
                     let qKey = item.question;
                     if (globalData[item.subject][status][qKey]) {
-                        qKey = `${item.question} [${item.correct_answer}]`;
+                        qKey = `${item.question} [Đáp án: ${item.correct_answer}]`;
                     }
                     globalData[item.subject][status][qKey] = {
                         correct: item.correct_answer,
@@ -115,7 +116,7 @@
                 document.getElementById('total-badge').innerText = 'Kết nối mây thành công!';
             } catch (err) {
                 console.error("Lỗi load data:", err);
-                document.getElementById('question-list').innerHTML = `<tr><td colspan="3" class="loading" style="color:red;">Lỗi kết nối Supabase: ${err.message}. Hãy bấm nút "Tải Lại"!</td></tr>`;
+                document.getElementById('question-list').innerHTML = `<tr><td colspan="4" class="loading" style="color:red;">Lỗi kết nối Supabase: ${err.message}. Hãy bấm nút "Tải Lại"!</td></tr>`;
                 document.getElementById('total-badge').innerText = 'Lỗi kết nối';
             }
         }
@@ -172,7 +173,7 @@
             let subjects = Object.keys(globalData);
             if (subjects.length === 0) {
                 select.innerHTML = '<option value="">Chưa có dữ liệu</option>';
-                document.getElementById('question-list').innerHTML = `<tr><td colspan="3" class="loading">Chưa có câu hỏi nào trên mây!</td></tr>`;
+                document.getElementById('question-list').innerHTML = `<tr><td colspan="4" class="loading">Chưa có câu hỏi nào trên mây!</td></tr>`;
                 return;
             }
 
@@ -209,31 +210,31 @@
             tbody.innerHTML = '';
 
             if (!sub || !globalData[sub]) {
-                tbody.innerHTML = `<tr><td colspan="3" class="loading">Không có dữ liệu cho môn này!</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" class="loading">Không có dữ liệu cho môn này!</td></tr>`;
                 return;
             }
 
             let targetList = globalData[sub][currentTab] || {};
             let keys = Object.keys(targetList);
 
-            // Tự động gom gộp hiển thị tất cả nếu tab hiện tại trống nhưng tổng kho có dữ liệu
             if (keys.length === 0) {
                 targetList = Object.assign({}, globalData[sub].correct || {}, globalData[sub].wrong || {});
                 keys = Object.keys(targetList);
             }
 
             if (keys.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="3" class="loading">Kho dữ liệu trống!</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" class="loading">Kho dữ liệu trống!</td></tr>`;
                 return;
             }
 
-            keys.forEach(q => {
+            keys.forEach((q, index) => {
                 let item = targetList[q];
                 let tr = document.createElement('tr');
                 let ansVal = typeof item === 'object' ? item.correct : item;
                 let optVal = typeof item === 'object' && item.options ? item.options.join(' | ') : '';
 
                 tr.innerHTML = `
+                    <td style="text-align: center; font-weight: bold; color: #555;">${index + 1}</td>
                     <td>${q}</td>
                     <td><b>Đáp án:</b> <span style="color: #28a745;">${ansVal}</span><br><small style="color:#666;">Lựa chọn: ${optVal}</small></td>
                     <td style="text-align: center;">
