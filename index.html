@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HOU LMS Cloud Study Hub - Quản Lý Kho Câu Hỏi</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 1200px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
@@ -79,14 +78,20 @@
         const SUPABASE_URL = 'https://pbyrzmmetkvvqydzkxo.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBieXJ6bW1ldGt2dnF5b2R6a3hvIicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyNzk1NzMsImV4cCI6MjEwNjg1NTU3M30.DGqyr-ESNBo1tYK5hCyG-nP2Tbq_ehAQKcyEgvEAlXM';
         
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         let currentTab = 'correct';
         let globalData = {};
 
         async function loadData() {
             try {
-                let { data, error } = await supabaseClient.from('question_banks').select('*');
-                if (error) throw error;
+                let response = await fetch(`${SUPABASE_URL}/rest/v1/question_banks?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+                if (!response.ok) throw new Error('Không thể tải dữ liệu từ Supabase');
+                
+                let data = await response.json();
 
                 globalData = {};
                 (data || []).forEach(item => {
@@ -144,8 +149,17 @@
 
                     for (let i = 0; i < records.length; i += 50) {
                         let batch = records.slice(i, i + 50);
-                        let { error } = await supabaseClient.from('question_banks').upsert(batch, { onConflict: 'subject,question' });
-                        if (error) throw error;
+                        let res = await fetch(`${SUPABASE_URL}/rest/v1/question_banks`, {
+                            method: 'POST',
+                            headers: {
+                                'apikey': SUPABASE_KEY,
+                                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                                'Content-Type': 'application/json',
+                                'Prefer': 'resolution=merge-duplicates'
+                            },
+                            body: JSON.stringify(batch)
+                        });
+                        if (!res.ok) throw new Error('Lỗi khi đẩy batch lên Supabase');
                     }
 
                     alert(`✨ Đã nhập thành công ${records.length} câu hỏi lên Supabase!`);
@@ -232,7 +246,13 @@
 
         async function deleteQuestion(sub, q) {
             if (confirm('Bạn có chắc muốn xóa câu hỏi này?')) {
-                await supabaseClient.from('question_banks').delete().eq('subject', sub).eq('question', q);
+                await fetch(`${SUPABASE_URL}/rest/v1/question_banks?subject=eq.${encodeURIComponent(sub)}&question=eq.${encodeURIComponent(q)}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
                 loadData();
             }
         }
@@ -241,7 +261,13 @@
             const sub = document.getElementById('subject-select').value;
             if (!sub) return;
             if (confirm(`Xóa toàn bộ dữ liệu môn [${sub}] trên mây?`)) {
-                await supabaseClient.from('question_banks').delete().eq('subject', sub);
+                await fetch(`${SUPABASE_URL}/rest/v1/question_banks?subject=eq.${encodeURIComponent(sub)}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
                 loadData();
             }
         }
