@@ -88,7 +88,12 @@
         async function loadData() {
             document.getElementById('total-badge').innerText = 'Đang đồng bộ...';
             try {
-                let { data, error } = await supabaseClient.from('question_banks').select('*');
+                // Tải toàn bộ không giới hạn 1000 dòng và sắp xếp theo thứ tự
+                let { data, error } = await supabaseClient
+                    .from('question_banks')
+                    .select('*')
+                    .range(0, 4999); // Cho phép tải tối đa lên tới 5000 câu
+                
                 if (error) throw error;
 
                 globalData = {};
