@@ -11,23 +11,24 @@
         .container { max-width: 1300px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         h1 { color: var(--primary); margin-top: 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 24px; }
         
-        /* Navigation Tabs */
         .main-nav { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #dee2e6; padding-bottom: 10px; }
         .nav-tab { padding: 10px 20px; font-weight: bold; background: #e9ecef; border: none; border-radius: 6px; cursor: pointer; color: #495057; }
         .nav-tab.active { background: var(--primary); color: white; }
 
-        /* Dashboard Layout */
         .section-view { display: none; }
         .section-view.active { display: block; }
 
         .semester-box { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
-        .semester-title { font-size: 18px; font-weight: bold; color: var(--primary); margin-bottom: 12px; border-bottom: 1px dashed #ccc; padding-bottom: 6px; }
+        .semester-title { font-size: 18px; font-weight: bold; color: var(--primary); margin-bottom: 12px; border-bottom: 1px dashed #ccc; padding-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
         
-        .subject-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 15px; }
-        .subject-card { background: white; border: 1px solid #ced4da; border-radius: 8px; padding: 15px; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .subject-card:hover { transform: translateY(-3px); border-color: var(--primary); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .subject-card h3 { margin: 0 0 8px 0; font-size: 16px; color: #212529; }
-        .subject-card p { margin: 0; font-size: 13px; color: #6c757d; }
+        .subject-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
+        .subject-card { background: white; border: 1px solid #ced4da; border-radius: 8px; padding: 15px; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .subject-card h3 { margin: 0 0 8px 0; font-size: 16px; color: #212529; cursor: pointer; }
+        .subject-card h3:hover { color: var(--primary); text-decoration: underline; }
+        .subject-card p { margin: 0 0 10px 0; font-size: 13px; color: #6c757d; }
+        
+        .card-actions { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; pt-2; margin-top: 8px; padding-top: 8px; }
+        .card-actions select { padding: 4px 8px; font-size: 12px; }
 
         .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; background: #f8f9fa; padding: 15px; border-radius: 8px; }
         select, button, input { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; cursor: pointer; }
@@ -56,16 +57,20 @@
             </div>
         </h1>
 
-        <!-- Thanh điều hướng chính -->
         <div class="main-nav">
             <button class="nav-tab active" onclick="switchMainTab('questions')">📖 Ngân Hàng Câu Hỏi</button>
             <button class="nav-tab" onclick="switchMainTab('deadlines')">📅 Lịch & Deadlines</button>
         </div>
 
-        <!-- TAB 1: NGÂN HÀNG CÂU HỎI THEO KỲ VÀ MÔN -->
+        <!-- TAB 1: NGÂN HÀNG CÂU HỎI -->
         <div id="view-questions" class="section-view active">
+            <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="new-semester-name" placeholder="Tên kỳ học mới (VD: Kỳ 2)...">
+                <button class="btn-success" onclick="addNewSemester()">➕ Thêm Kỳ Học</button>
+            </div>
+
             <div id="subject-directory">
-                <div class="loading">Đang phân loại các môn học theo kỳ...</div>
+                <div class="loading">Đang tải toàn bộ dữ liệu...</div>
             </div>
 
             <div id="question-workspace" style="display: none; margin-top: 20px;">
@@ -132,21 +137,32 @@
         let globalData = {};
         let activeSubject = '';
         let currentQuestionTab = 'correct';
-
-        // Phân loại môn học vào các Kỳ học mẫu (có thể tùy chỉnh tên môn cho khớp)
-        const semesterMapping = {
-            "Kỳ 1 (Đại cương & Nền tảng)": ["Pháp luật đại cương", "Triết học Mác", "Đọc 1", "Viết 1", "Ngữ âm tiếng Anh cơ bản", "Nghe 1", "Tin học đại cương"],
-            "Kỳ 2 (Chuyên ngành cơ sở)": [] // Các môn khác sẽ tự động xếp vào mục này
-        };
+        let semesters = JSON.parse(localStorage.getItem('hou_semesters') || '["Kỳ 1", "Kỳ 2", "Kỳ 3"]');
+        let subjectSemesterMap = JSON.parse(localStorage.getItem('hou_subject_map') || '{}');
 
         async function loadData() {
             document.getElementById('total-badge').innerText = 'Đang đồng bộ...';
             try {
-                let { data, error } = await supabaseClient.from('question_banks').select('*').range(0, 4999);
-                if (error) throw error;
+                // Phân trang tự động lấy sạch 100% tất cả bản ghi trên Supabase (vượt giới hạn 1000 dòng)
+                let allData = [];
+                let step = 1000;
+                let from = 0;
+                let fetchMore = true;
+
+                while (fetchMore) {
+                    let { data, error } = await supabaseClient.from('question_banks').select('*').range(from, from + step - 1);
+                    if (error) throw error;
+                    if (data && data.length > 0) {
+                        allData = allData.concat(data);
+                        from += step;
+                        if (data.length < step) fetchMore = false;
+                    } else {
+                        fetchMore = false;
+                    }
+                }
 
                 globalData = {};
-                (data || []).forEach(item => {
+                allData.forEach(item => {
                     let subName = (item.subject || "Chung").trim();
                     if (!globalData[subName]) {
                         globalData[subName] = { correct: {}, wrong: {} };
@@ -169,7 +185,7 @@
 
                 renderDirectory();
                 loadDeadlines();
-                document.getElementById('total-badge').innerText = 'Kết nối mây thành công!';
+                document.getElementById('total-badge').innerText = `Đã tải ${allData.length} câu (Mây OK)!`;
             } catch (err) {
                 console.error("Lỗi load data:", err);
                 document.getElementById('total-badge').innerText = 'Lỗi kết nối';
@@ -189,6 +205,23 @@
             }
         }
 
+        function addNewSemester() {
+            let name = document.getElementById('new-semester-name').value.trim();
+            if (!name) return;
+            if (!semesters.includes(name)) {
+                semesters.push(name);
+                localStorage.setItem('hou_semesters', JSON.stringify(semesters));
+                document.getElementById('new-semester-name').value = '';
+                renderDirectory();
+            }
+        }
+
+        function changeSubjectSemester(subName, semName) {
+            subjectSemesterMap[subName] = semName;
+            localStorage.setItem('hou_subject_map', JSON.stringify(subjectSemesterMap));
+            renderDirectory();
+        }
+
         function renderDirectory() {
             const container = document.getElementById('subject-directory');
             container.innerHTML = '';
@@ -199,27 +232,27 @@
                 return;
             }
 
-            // Gom nhóm môn học theo kỳ
-            let grouped = { "Kỳ 1": [], "Kỳ Khác / Mới Cập Nhật": [] };
-            
+            let grouped = {};
+            semesters.forEach(sem => grouped[sem] = []);
+            let unassigned = [];
+
             subjects.forEach(sub => {
                 let count = Object.keys(globalData[sub].correct || {}).length + Object.keys(globalData[sub].wrong || {}).length;
-                let foundSem = false;
-                for (let [sem, list] of Object.entries(semesterMapping)) {
-                    if (list.includes(sub)) {
-                        if (!grouped[sem]) grouped[sem] = [];
-                        grouped[sem].push({ name: sub, count });
-                        foundSem = true;
-                        break;
-                    }
-                }
-                if (!foundSem) {
-                    grouped["Kỳ Khác / Mới Cập Nhật"].push({ name: sub, count });
+                let sem = subjectSemesterMap[sub];
+                if (sem && grouped[sem]) {
+                    grouped[sem].push({ name: sub, count });
+                } else {
+                    unassigned.push({ name: sub, count });
                 }
             });
 
+            if (unassigned.length > 0) {
+                grouped["Chưa phân kỳ"] = unassigned;
+                if (!semesters.includes("Chưa phân kỳ")) semesters.push("Chưa phân kỳ");
+            }
+
             for (let [sem, list] of Object.entries(grouped)) {
-                if (list.length === 0) continue;
+                if (list.length === 0 && sem !== "Kỳ 1") continue;
                 let semBox = document.createElement('div');
                 semBox.className = 'semester-box';
                 semBox.innerHTML = `<div class="semester-title">📂 ${sem}</div>`;
@@ -230,8 +263,17 @@
                 list.forEach(item => {
                     let card = document.createElement('div');
                     card.className = 'subject-card';
-                    card.innerHTML = `<h3>📖 ${item.name}</h3><p>📊 Tổng số: <b>${item.count}</b> câu hỏi</p>`;
-                    card.onclick = () => openSubject(item.name);
+                    
+                    let semOptions = semesters.map(s => `<option value="${s}" ${subjectSemesterMap[item.name] === s ? 'selected' : ''}>${s}</option>`).join('');
+
+                    card.innerHTML = `
+                        <h3 onclick="openSubject('${item.name.replace(/'/g, "\\'")}')">📖 ${item.name}</h3>
+                        <p>📊 Tổng số: <b>${item.count}</b> câu hỏi</p>
+                        <div class="card-actions">
+                            <small>Đổi kỳ:</small>
+                            <select onchange="changeSubjectSemester('${item.name.replace(/'/g, "\\'")}', this.value)">${semOptions}</select>
+                        </div>
+                    `;
                     grid.appendChild(card);
                 });
 
@@ -312,17 +354,14 @@
             }
         }
 
-        // QUẢN LÝ DEADLINES TRÊN SUPABASE
         async function loadDeadlines() {
             let { data } = await supabaseClient.from('deadlines').select('*');
             const tbody = document.getElementById('deadline-list');
             tbody.innerHTML = '';
-
             if (!data || data.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="3" class="loading">Chưa có lịch deadlines nào.</td></tr>`;
                 return;
             }
-
             data.forEach(item => {
                 let tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -337,10 +376,7 @@
         async function addDeadline() {
             let title = document.getElementById('dl-title').value.trim();
             let dueDate = document.getElementById('dl-time').value;
-            if (!title || !dueDate) {
-                alert('Vui lòng nhập đầy đủ tiêu đề và thời gian hạn chót!');
-                return;
-            }
+            if (!title || !dueDate) { alert('Vui lòng nhập đầy đủ!'); return; }
             await supabaseClient.from('deadlines').insert([{ title, due_date: dueDate }]);
             document.getElementById('dl-title').value = '';
             document.getElementById('dl-time').value = '';
