@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HOU LMS Study Hub - Quản Lý Kho Câu Hỏi</title>
+    <title>HOU LMS Cloud Study Hub - Quản Lý Kho Câu Hỏi</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
@@ -19,6 +19,8 @@
         .btn-success:hover { background: #218838; }
         .btn-warning { background: #ffc107; color: #333; }
         .btn-warning:hover { background: #e0a800; }
+        .btn-info { background: #17a2b8; color: white; }
+        .btn-info:hover { background: #138496; }
         .tab-container { display: flex; gap: 5px; }
         .tab-btn { background: #e9ecef; color: #495057; border: none; }
         .tab-btn.active-correct { background: #0056b3; color: white; }
@@ -34,9 +36,10 @@
     <div class="container">
         <h1>
             📚 HOU LMS Cloud Study Hub
-            <div style="display: flex; gap: 10px; align-items: center;">
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <input type="file" id="json-file-input" style="display: none;" accept=".json" onchange="importJSON(event)">
-                <button class="btn-warning" onclick="document.getElementById('json-file-input').click()">📥 Nhập File JSON (1000+ câu)</button>
+                <button class="btn-warning" onclick="document.getElementById('json-file-input').click()">📥 Nhập File JSON</button>
+                <button class="btn-info" onclick="exportAllJSON()">📤 Xuất All JSON</button>
                 <span id="total-badge" style="font-size: 14px; background: #e2e8f0; color: #2d3748; padding: 4px 10px; border-radius: 20px;">Đang kết nối...</span>
             </div>
         </h1>
@@ -51,7 +54,7 @@
                 </div>
             </div>
             <div>
-                <button class="btn-success" onclick="exportWord()">📝 Xuất Word Môn</button>
+                <button class="btn-success" onclick="exportWord()">📝 Xuất Word Ôn Tập</button>
                 <button class="btn-danger" onclick="deleteSubject()">🗑️ Xóa Môn Này</button>
             </div>
         </div>
@@ -74,7 +77,7 @@
 
     <script>
         const SUPABASE_URL = 'https://pbyrzmmetkvvqydzkxo.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBieXJ6bW1ldGt2dnF5b2R6a3hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyNzk1NzMsImV4cCI6MjEwNjg1NTU3M30.DGqyr-ESNBo1tYK5hCyG-nP2Tbq_ehAQKcyEgvEAlXM';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBieXJ6bW1ldGt2dnF5b2R6a3hvIicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyNzk1NzMsImV4cCI6MjEwNjg1NTU3M30.DGqyr-ESNBo1tYK5hCyG-nP2Tbq_ehAQKcyEgvEAlXM';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         let currentTab = 'correct';
@@ -93,7 +96,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
                     let status = item.status || 'correct';
                     globalData[item.subject][status][item.question] = {
                         correct: item.correct_answer,
-                        options: item.options
+                        options: item.options || []
                     };
                 });
 
@@ -112,42 +115,37 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
             reader.onload = async function(e) {
                 try {
                     const jsonData = JSON.parse(e.target.result);
-                    alert('Đang xử lý và đẩy dữ liệu lên mây, vui lòng đợi giây lát...');
+                    alert('Đang xử lý và đẩy dữ liệu lên mây, vui lòng chờ giây lát...');
                     
                     let records = [];
-                    let entries = Array.isArray(jsonData) ? jsonData : Object.entries(jsonData);
-
-                    entries.forEach(item => {
-                        let sub = item.subject || "Môn học chung";
-                        let q = item.question || item[0];
-                        let ans = item.correct_answer || item[1]?.correct;
-                        let opts = item.options || item[1]?.options || [];
-
-                        if (q && ans) {
-                            records.push({
-                                subject: sub,
-                                question: q,
-                                correct_answer: ans,
-                                options: opts,
-                                status: 'correct',
-                                updated_at: new Date().toISOString()
-                            });
-                        }
-                    });
-
-                    // Đẩy dữ liệu theo từng gói 50 câu để chống quá tải kết nối
-                    for (let i = 0; i < records.length; i += 50) {
-                        let batch = records.slice(i, i + 50);
-                        let { error } = await supabaseClient.from('question_banks').insert(batch);
-                        if (error) {
-                            console.warn("Bỏ qua lỗi trùng lặp nhỏ:", error.message);
+                    for (let [sub, content] of Object.entries(jsonData)) {
+                        let correctDict = content.correct || content;
+                        for (let [q, info] of Object.entries(correctDict)) {
+                            let ans = info.correct || info;
+                            let opts = info.options || [];
+                            if (q && ans) {
+                                records.push({
+                                    subject: sub,
+                                    question: q,
+                                    correct_answer: ans,
+                                    options: opts,
+                                    status: 'correct',
+                                    updated_at: new Date().toISOString()
+                                });
+                            }
                         }
                     }
 
-                    alert(`✨ Đã nhập thành công tổng cộng ${records.length} câu hỏi lên Supabase!`);
+                    for (let i = 0; i < records.length; i += 50) {
+                        let batch = records.slice(i, i + 50);
+                        let { error } = await supabaseClient.from('question_banks').upsert(batch, { onConflict: 'subject,question' });
+                        if (error) throw error;
+                    }
+
+                    alert(`✨ Đã nhập thành công ${records.length} câu hỏi lên Supabase!`);
                     loadData();
                 } catch (err) {
-                    alert('Lỗi đọc file JSON: ' + err.message);
+                    alert('Lỗi nhập file JSON: ' + err.message);
                 }
             };
             reader.readAsText(file);
@@ -161,7 +159,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
             let subjects = Object.keys(globalData);
             if (subjects.length === 0) {
                 select.innerHTML = '<option value="">Chưa có dữ liệu</option>';
-                document.getElementById('question-list').innerHTML = `<tr><td colspan="3" class="loading">Chưa có câu hỏi nào trên mây! Hãy bấm nút "Nhập File JSON" màu vàng phía trên.</td></tr>`;
+                document.getElementById('question-list').innerHTML = `<tr><td colspan="3" class="loading">Chưa có câu hỏi nào trên mây! Hãy bấm "📥 Nhập File JSON".</td></tr>`;
                 document.getElementById('total-badge').innerText = `Tổng số: 0 câu`;
                 return;
             }
@@ -220,7 +218,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
                 let tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${q}</td>
-                    <td><b>Đáp án:</b> <span style="color: ${currentTab === 'correct' ? '#28a745' : '#dc3545'};">${item.correct}</span><br><small style="color:#666;">Các lựa chọn: ${item.options ? item.options.join(', ') : ''}</small></td>
+                    <td><b>Đáp án:</b> <span style="color: ${currentTab === 'correct' ? '#28a745' : '#dc3545'};">${item.correct}</span><br><small style="color:#666;">Lựa chọn: ${item.options ? item.options.join(' | ') : ''}</small></td>
                     <td style="text-align: center;">
                         <button class="btn-danger" style="padding: 5px 8px; font-size: 12px;" onclick="deleteQuestion('${sub}', '${q.replace(/'/g, "\\'")}')">Xóa</button>
                     </td>
@@ -259,11 +257,28 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
             let html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
             <head><meta charset='utf-8'><title>${sub}</title></head>
-            <body style="font-family:'Times New Roman'; font-size:14pt;">
-            <h1 style="text-align:center; color:#0056b3;">ĐÁP ÁN MÔN: ${sub.toUpperCase()}</h1>`;
+            <body style="font-family:'Times New Roman'; font-size:13pt; line-height: 1.4;">
+            <h1 style="text-align:center; color:#0056b3;">ĐÁP ÁN ÔN TẬP: ${sub.toUpperCase()}</h1><hr>`;
 
             keys.forEach((q, idx) => {
-                html += `<div style="margin-bottom:15px;"><b>Câu ${idx+1}:</b> ${q}<br><span style="color:green; font-weight:bold;">👉 Đáp án: ${correctList[q].correct}</span></div>`;
+                let item = correctList[q];
+                html += `<div style="margin-bottom:15px;">
+                    <b>Câu ${idx+1}:</b> ${q}<br>`;
+                
+                if (item.options && item.options.length > 0) {
+                    item.options.forEach((opt, oIdx) => {
+                        let optLetter = String.fromCharCode(65 + oIdx);
+                        let isCorrect = opt.trim().toLowerCase() === item.correct.trim().toLowerCase();
+                        if (isCorrect) {
+                            html += `<span style="color: #008000; font-weight: bold;">&nbsp;&nbsp;&nbsp;&nbsp;${optLetter}. ${opt} (Đúng)</span><br>`;
+                        } else {
+                            html += `&nbsp;&nbsp;&nbsp;&nbsp;${optLetter}. ${opt}<br>`;
+                        }
+                    });
+                } else {
+                    html += `<span style="color: #008000; font-weight: bold;">👉 Đáp án: ${item.correct}</span><br>`;
+                }
+                html += `</div>`;
             });
             html += `</body></html>`;
 
@@ -271,7 +286,26 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
             let url = URL.createObjectURL(blob);
             let a = document.createElement('a');
             a.href = url;
-            a.download = `Bo_Dap_An_${sub.replace(/\s+/g, '_')}.doc`;
+            a.download = `On_Tap_${sub.replace(/\s+/g, '_')}.doc`;
+            a.click();
+        }
+
+        function exportAllJSON() {
+            let exportObj = {};
+            for (let sub of Object.keys(globalData)) {
+                exportObj[sub] = { correct: {}, wrong: {} };
+                for (let q of Object.keys(globalData[sub].correct || {})) {
+                    exportObj[sub].correct[q] = globalData[sub].correct[q];
+                }
+                for (let q of Object.keys(globalData[sub].wrong || {})) {
+                    exportObj[sub].wrong[q] = globalData[sub].wrong[q];
+                }
+            }
+
+            let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
+            let a = document.createElement('a');
+            a.href = dataStr;
+            a.download = "Kho_Dap_An_Backup_Full.json";
             a.click();
         }
 
