@@ -97,8 +97,8 @@
                         <tr>
                             <th style="width: 5%; text-align: center;">STT</th>
                             <th style="width: 45%;">Câu hỏi</th>
-                            <th style="width: 40%;">Đáp án / Lựa chọn</th>
-                            <th style="width: 10%; text-align: center;">Thao tác</th>
+                            <th style="width: 35%;">Đáp án / Lựa chọn</th>
+                            <th style="width: 15%; text-align: center;">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody id="question-list">
@@ -139,8 +139,8 @@
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         
-        let subjectStats = {}; // Chỉ chứa tên môn và số lượng câu hỏi
-        let activeSubjectData = { correct: {}, wrong: {} }; // Chỉ tải chi tiết khi click vào môn
+        let subjectStats = {}; 
+        let activeSubjectData = { correct: {}, wrong: {} }; 
         let activeSubject = '';
         let currentQuestionTab = 'correct';
         let semesters = JSON.parse(localStorage.getItem('hou_semesters') || '["Kỳ 1", "Kỳ 2", "Kỳ 3"]');
@@ -149,7 +149,6 @@
         async function loadDirectory() {
             document.getElementById('total-badge').innerText = 'Đang đồng bộ...';
             try {
-                // Vòng lặp phân trang tự động quét sạch 100% toàn bộ bản ghi trên mây không giới hạn 1000 dòng
                 let allItems = [];
                 let step = 1000;
                 let from = 0;
@@ -193,6 +192,7 @@
                 document.getElementById('total-badge').innerText = 'Lỗi kết nối';
             }
         }
+
         function switchMainTab(tab) {
             document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.section-view').forEach(v => v.classList.remove('active'));
@@ -285,7 +285,6 @@
             }
         }
 
-        // Khi bấm vào môn nào, chỉ tải dữ liệu của đúng môn đó lên
         async function openSubject(subName) {
             activeSubject = subName;
             currentQuestionTab = 'correct';
@@ -313,9 +312,6 @@
                     }
                     
                     let qKey = item.question;
-                    if (activeSubjectData[status][qKey]) {
-                        qKey = `${item.question} [Đáp án: ${item.correct_answer}]`;
-                    }
                     activeSubjectData[status][qKey] = {
                         correct: item.correct_answer,
                         options: Array.isArray(opts) ? opts : []
@@ -332,6 +328,7 @@
         function backToDirectory() {
             document.getElementById('question-workspace').style.display = 'none';
             document.getElementById('subject-directory').style.display = 'block';
+            loadDirectory();
         }
 
         function switchQuestionTab(tab) {
@@ -370,22 +367,50 @@
                 let ansVal = typeof item === 'object' ? item.correct : item;
                 let optVal = typeof item === 'object' && item.options ? item.options.join(' | ') : '';
 
+                let actionHtml = `<button class="btn-danger" style="padding: 5px 8px; font-size: 12px;" onclick="deleteQuestion('${activeSubject}', '${q.replace(/'/g, "\\'")}')">Xóa</button>`;
+                
+                // Nếu đang ở Kho Sai, thêm nút Sửa & Chuyển sang Kho Đúng
+                if (currentQuestionTab === 'wrong') {
+                    actionHtml = `
+                        <div style="display: flex; flex-direction: column; gap: 5px; align-items: center;">
+                            <button class="btn-success" style="padding: 5px 8px; font-size: 11px;" onclick="fixAndMoveToCorrect('${activeSubject}', '${q.replace(/'/g, "\\'")}')">Sửa & Chuyển Đúng</button>
+                            <button class="btn-danger" style="padding: 4px 6px; font-size: 11px;" onclick="deleteQuestion('${activeSubject}', '${q.replace(/'/g, "\\'")}')">Xóa</button>
+                        </div>
+                    `;
+                }
+
                 tr.innerHTML = `
                     <td style="text-align: center; font-weight: bold; color: #555;">${index + 1}</td>
                     <td>${q}</td>
                     <td><b>Đáp án:</b> <span style="color: var(--success);">${ansVal}</span><br><small style="color:#666;">Lựa chọn: ${optVal}</small></td>
-                    <td style="text-align: center;">
-                        <button class="btn-danger" style="padding: 5px 8px; font-size: 12px;" onclick="deleteQuestion('${activeSubject}', '${q.replace(/'/g, "\\'")}')">Xóa</button>
-                    </td>
+                    <td style="text-align: center;">${actionHtml}</td>
                 `;
                 tbody.appendChild(tr);
             });
         }
 
+        // Tính năng sửa đáp án và chuyển sang Kho Đúng
+        async function fixAndMoveToCorrect(sub, q) {
+            let newAns = prompt("Nhập đáp án đúng chuẩn xác sau khi tra cứu:", "");
+            if (!newAns) return;
+
+            let { error } = await supabaseClient
+                .from('question_banks')
+                .update({ correct_answer: newAns, status: 'correct', updated_at: new Date().toISOString() })
+                .eq('subject', sub)
+                .eq('question', q);
+
+            if (error) {
+                alert('Lỗi cập nhật!');
+            } else {
+                alert('✨ Đã cập nhật đáp án và chuyển sang Kho Đúng thành công!');
+                openSubject(sub);
+            }
+        }
+
         async function deleteQuestion(sub, q) {
             if (confirm('Xóa câu hỏi này khỏi mây chung?')) {
-                let cleanQ = q.includes(' [') ? q.split(' [')[0] : q;
-                await supabaseClient.from('question_banks').delete().eq('subject', sub).eq('question', cleanQ);
+                await supabaseClient.from('question_banks').delete().eq('subject', sub).eq('question', q);
                 openSubject(sub);
             }
         }
@@ -395,7 +420,6 @@
             if (confirm(`Xóa toàn bộ dữ liệu môn [${activeSubject}] trên mây chung?`)) {
                 await supabaseClient.from('question_banks').delete().eq('subject', activeSubject);
                 backToDirectory();
-                loadDirectory();
             }
         }
 
@@ -474,8 +498,7 @@
 
             keys.forEach((q, idx) => {
                 let item = correctList[q];
-                let displayQ = q.includes(' [') ? q.split(' [')[0] : q;
-                html += `<div style="margin-bottom:15px;"><b>Câu ${idx+1}:</b> ${displayQ}<br>`;
+                html += `<div style="margin-bottom:15px;"><b>Câu ${idx+1}:</b> ${q}<br>`;
                 if (item.options && item.options.length > 0) {
                     item.options.forEach((opt, oIdx) => {
                         let optLetter = String.fromCharCode(65 + oIdx);
