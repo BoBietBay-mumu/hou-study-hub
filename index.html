@@ -94,14 +94,20 @@
                         globalData[item.subject] = { correct: {}, wrong: {} };
                     }
                     let status = item.status || 'correct';
+                    let opts = item.options;
+                    if (typeof opts === 'string') {
+                        try { opts = JSON.parse(opts); } catch(e) { opts = []; }
+                    }
                     globalData[item.subject][status][item.question] = {
                         correct: item.correct_answer,
-                        options: item.options || []
+                        options: Array.isArray(opts) ? opts : []
                     };
                 });
 
                 updateSubjectDropdown();
+                document.getElementById('total-badge').innerText = 'Kết nối mây thành công!';
             } catch (err) {
+                console.error("Lỗi load data:", err);
                 document.getElementById('question-list').innerHTML = `<tr><td colspan="3" class="loading" style="color:red;">Lỗi kết nối Supabase: ${err.message}</td></tr>`;
                 document.getElementById('total-badge').innerText = 'Lỗi kết nối';
             }
@@ -160,7 +166,6 @@
             if (subjects.length === 0) {
                 select.innerHTML = '<option value="">Chưa có dữ liệu</option>';
                 document.getElementById('question-list').innerHTML = `<tr><td colspan="3" class="loading">Chưa có câu hỏi nào trên mây! Hãy bấm "📥 Nhập File JSON".</td></tr>`;
-                document.getElementById('total-badge').innerText = `Tổng số: 0 câu`;
                 return;
             }
 
@@ -203,10 +208,6 @@
 
             let targetList = globalData[sub][currentTab] || {};
             let keys = Object.keys(targetList);
-
-            let totalCorrect = Object.keys(globalData[sub].correct || {}).length;
-            let totalWrong = Object.keys(globalData[sub].wrong || {}).length;
-            document.getElementById('total-badge').innerText = `📖 ${sub} | Đúng: ${totalCorrect} | Sai: ${totalWrong}`;
 
             if (keys.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="3" class="loading">${currentTab === 'correct' ? 'Kho Đúng' : 'Kho Sai'} trống!</td></tr>`;
