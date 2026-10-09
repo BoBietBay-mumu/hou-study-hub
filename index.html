@@ -3,31 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HOU LMS Cloud Study Hub - Dùng Chung</title>
+    <title>HOU LMS Smart Hub - Quản Lý Học Tập & Ngân Hàng Câu Hỏi</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h1 { color: #0056b3; margin-top: 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        :root { --primary: #0056b3; --success: #28a745; --danger: #dc3545; --warning: #ffc107; --bg: #f4f6f9; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1300px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: var(--primary); margin-top: 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 24px; }
+        
+        /* Navigation Tabs */
+        .main-nav { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #dee2e6; padding-bottom: 10px; }
+        .nav-tab { padding: 10px 20px; font-weight: bold; background: #e9ecef; border: none; border-radius: 6px; cursor: pointer; color: #495057; }
+        .nav-tab.active { background: var(--primary); color: white; }
+
+        /* Dashboard Layout */
+        .section-view { display: none; }
+        .section-view.active { display: block; }
+
+        .semester-box { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+        .semester-title { font-size: 18px; font-weight: bold; color: var(--primary); margin-bottom: 12px; border-bottom: 1px dashed #ccc; padding-bottom: 6px; }
+        
+        .subject-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 15px; }
+        .subject-card { background: white; border: 1px solid #ced4da; border-radius: 8px; padding: 15px; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .subject-card:hover { transform: translateY(-3px); border-color: var(--primary); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .subject-card h3 { margin: 0 0 8px 0; font-size: 16px; color: #212529; }
+        .subject-card p { margin: 0; font-size: 13px; color: #6c757d; }
+
         .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; background: #f8f9fa; padding: 15px; border-radius: 8px; }
-        select, button { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; cursor: pointer; }
-        button { background: #0056b3; color: white; border: none; }
+        select, button, input { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; cursor: pointer; }
+        button { background: var(--primary); color: white; border: none; }
         button:hover { background: #004085; }
-        .btn-danger { background: #dc3545; }
-        .btn-danger:hover { background: #bd2130; }
-        .btn-success { background: #28a745; }
-        .btn-success:hover { background: #218838; }
-        .btn-warning { background: #ffc107; color: #333; }
-        .btn-warning:hover { background: #e0a800; }
-        .btn-info { background: #17a2b8; color: white; }
-        .btn-info:hover { background: #138496; }
-        .tab-container { display: flex; gap: 5px; }
-        .tab-btn { background: #e9ecef; color: #495057; border: none; }
-        .tab-btn.active-correct { background: #0056b3; color: white; }
-        .tab-btn.active-wrong { background: #dc3545; color: white; }
+        .btn-danger { background: var(--danger); }
+        .btn-success { background: var(--success); }
+        .btn-warning { background: var(--warning); color: #333; }
+        
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
         th, td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
-        th { background: #0056b3; color: white; }
+        th { background: var(--primary); color: white; }
         tr:nth-child(even) { background: #f9f9f9; }
         .loading { text-align: center; padding: 30px; font-weight: bold; color: #666; }
     </style>
@@ -35,43 +47,77 @@
 <body>
     <div class="container">
         <h1>
-            📚 HOU LMS Cloud Study Hub (Dùng Chung)
+            📚 HOU LMS Smart Hub (Dùng Chung)
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <input type="file" id="json-file-input" style="display: none;" accept=".json" onchange="importJSON(event)">
-                <button class="btn-warning" onclick="document.getElementById('json-file-input').click()">📥 Nhập File JSON</button>
-                <button class="btn-info" onclick="exportAllJSON()">📤 Xuất All JSON</button>
+                <button class="btn-warning" onclick="document.getElementById('json-file-input').click()">📥 Nhập JSON</button>
                 <button class="btn-success" onclick="loadData()" style="padding: 6px 10px; font-size: 12px;">🔄 Tải Lại</button>
                 <span id="total-badge" style="font-size: 14px; background: #e2e8f0; color: #2d3748; padding: 4px 10px; border-radius: 20px;">Đang kết nối mây...</span>
             </div>
         </h1>
 
-        <div class="controls">
-            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <label><b>Chọn môn:</b></label>
-                <select id="subject-select" style="min-width: 200px;"></select>
-                <div class="tab-container">
-                    <button id="btn-tab-correct" class="tab-btn active-correct" onclick="switchTab('correct')">✅ Kho Đúng</button>
-                    <button id="btn-tab-wrong" class="tab-btn" onclick="switchTab('wrong')">❌ Kho Sai</button>
-                </div>
+        <!-- Thanh điều hướng chính -->
+        <div class="main-nav">
+            <button class="nav-tab active" onclick="switchMainTab('questions')">📖 Ngân Hàng Câu Hỏi</button>
+            <button class="nav-tab" onclick="switchMainTab('deadlines')">📅 Lịch & Deadlines</button>
+        </div>
+
+        <!-- TAB 1: NGÂN HÀNG CÂU HỎI THEO KỲ VÀ MÔN -->
+        <div id="view-questions" class="section-view active">
+            <div id="subject-directory">
+                <div class="loading">Đang phân loại các môn học theo kỳ...</div>
             </div>
-            <div>
-                <button class="btn-success" onclick="exportWord()">📝 Xuất Word Ôn Tập</button>
-                <button class="btn-danger" onclick="deleteSubject()">🗑️ Xóa Môn Này</button>
+
+            <div id="question-workspace" style="display: none; margin-top: 20px;">
+                <button onclick="backToDirectory()" style="margin-bottom: 15px; background: #6c757d;">⬅️ Quay lại danh sách môn</button>
+                <div class="controls">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <h2 id="active-subject-title" style="margin: 0; color: var(--primary);">Môn học</h2>
+                        <div style="display: flex; gap: 5px; margin-left: 15px;">
+                            <button id="btn-tab-correct" class="btn-success" onclick="switchQuestionTab('correct')">✅ Kho Đúng</button>
+                            <button id="btn-tab-wrong" class="btn-danger" onclick="switchQuestionTab('wrong')">❌ Kho Sai</button>
+                        </div>
+                    </div>
+                    <div>
+                        <button class="btn-success" onclick="exportWord()">📝 Xuất Word Ôn Tập</button>
+                        <button class="btn-danger" onclick="deleteSubject()">🗑️ Xóa Môn Này</button>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 5%; text-align: center;">STT</th>
+                            <th style="width: 45%;">Câu hỏi</th>
+                            <th style="width: 40%;">Đáp án / Lựa chọn</th>
+                            <th style="width: 10%; text-align: center;">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="question-list"></tbody>
+                </table>
             </div>
         </div>
 
-        <div id="content-area">
+        <!-- TAB 2: LỊCH VÀ DEADLINES -->
+        <div id="view-deadlines" class="section-view">
+            <h2>📅 Quản Lý Lịch Học & Hạn Nộp Bài (Deadlines)</h2>
+            <div class="controls">
+                <div style="display: flex; gap: 10px; align-items: center; width: 100%;">
+                    <input type="text" id="dl-title" placeholder="Tên môn / Nội dung hạn nộp..." style="flex: 2;">
+                    <input type="datetime-local" id="dl-time" style="flex: 1;">
+                    <button class="btn-success" onclick="addDeadline()">➕ Thêm Lịch Mới</button>
+                </div>
+            </div>
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 5%; text-align: center;">STT</th>
-                        <th style="width: 45%;">Câu hỏi</th>
-                        <th style="width: 40%;">Đáp án / Lựa chọn</th>
+                        <th style="width: 60%;">Nội dung công việc / Môn học</th>
+                        <th style="width: 30%;">Thời gian hạn chót</th>
                         <th style="width: 10%; text-align: center;">Thao tác</th>
                     </tr>
                 </thead>
-                <tbody id="question-list">
-                    <tr><td colspan="4" class="loading">Đang tải dữ liệu từ Supabase...</td></tr>
+                <tbody id="deadline-list">
+                    <tr><td colspan="3" class="loading">Chưa có lịch nào được lưu.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -82,24 +128,28 @@
         const SUPABASE_KEY = 'sb_publishable_hEzd_AChOmjjJ8fdPdFE9Q_msO0rQin';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        let currentTab = 'correct';
+        
         let globalData = {};
+        let activeSubject = '';
+        let currentQuestionTab = 'correct';
+
+        // Phân loại môn học vào các Kỳ học mẫu (có thể tùy chỉnh tên môn cho khớp)
+        const semesterMapping = {
+            "Kỳ 1 (Đại cương & Nền tảng)": ["Pháp luật đại cương", "Triết học Mác", "Đọc 1", "Viết 1", "Ngữ âm tiếng Anh cơ bản", "Nghe 1", "Tin học đại cương"],
+            "Kỳ 2 (Chuyên ngành cơ sở)": [] // Các môn khác sẽ tự động xếp vào mục này
+        };
 
         async function loadData() {
             document.getElementById('total-badge').innerText = 'Đang đồng bộ...';
             try {
-                // Tải toàn bộ không giới hạn 1000 dòng và sắp xếp theo thứ tự
-                let { data, error } = await supabaseClient
-                    .from('question_banks')
-                    .select('*')
-                    .range(0, 4999); // Cho phép tải tối đa lên tới 5000 câu
-                
+                let { data, error } = await supabaseClient.from('question_banks').select('*').range(0, 4999);
                 if (error) throw error;
 
                 globalData = {};
                 (data || []).forEach(item => {
-                    if (!globalData[item.subject]) {
-                        globalData[item.subject] = { correct: {}, wrong: {} };
+                    let subName = (item.subject || "Chung").trim();
+                    if (!globalData[subName]) {
+                        globalData[subName] = { correct: {}, wrong: {} };
                     }
                     let status = item.status && item.status.trim() !== '' ? item.status.trim() : 'correct';
                     let opts = item.options;
@@ -108,127 +158,122 @@
                     }
                     
                     let qKey = item.question;
-                    if (globalData[item.subject][status][qKey]) {
+                    if (globalData[subName][status][qKey]) {
                         qKey = `${item.question} [Đáp án: ${item.correct_answer}]`;
                     }
-                    globalData[item.subject][status][qKey] = {
+                    globalData[subName][status][qKey] = {
                         correct: item.correct_answer,
                         options: Array.isArray(opts) ? opts : []
                     };
                 });
 
-                updateSubjectDropdown();
+                renderDirectory();
+                loadDeadlines();
                 document.getElementById('total-badge').innerText = 'Kết nối mây thành công!';
             } catch (err) {
                 console.error("Lỗi load data:", err);
-                document.getElementById('question-list').innerHTML = `<tr><td colspan="4" class="loading" style="color:red;">Lỗi kết nối Supabase: ${err.message}. Hãy bấm nút "Tải Lại"!</td></tr>`;
                 document.getElementById('total-badge').innerText = 'Lỗi kết nối';
             }
         }
 
-        async function importJSON(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                try {
-                    const jsonData = JSON.parse(e.target.result);
-                    alert('Đang xử lý và đẩy dữ liệu lên mây chung, vui lòng chờ...');
-                    
-                    let records = [];
-                    for (let [sub, content] of Object.entries(jsonData)) {
-                        let correctDict = content.correct || content;
-                        for (let [q, info] of Object.entries(correctDict)) {
-                            let ans = info.correct || info;
-                            let opts = info.options || [];
-                            if (q && ans) {
-                                records.push({
-                                    subject: sub,
-                                    question: q,
-                                    correct_answer: ans,
-                                    options: opts,
-                                    status: 'correct',
-                                    updated_at: new Date().toISOString()
-                                });
-                            }
-                        }
-                    }
-
-                    for (let i = 0; i < records.length; i += 50) {
-                        let batch = records.slice(i, i + 50);
-                        let { error } = await supabaseClient.from('question_banks').upsert(batch, { onConflict: 'subject,question' });
-                        if (error) throw error;
-                    }
-
-                    alert(`✨ Đã nhập thành công ${records.length} câu hỏi lên mây chung!`);
-                    loadData();
-                } catch (err) {
-                    alert('Lỗi nhập file JSON: ' + err.message);
-                }
-            };
-            reader.readAsText(file);
+        function switchMainTab(tab) {
+            document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.section-view').forEach(v => v.classList.remove('active'));
+            
+            if (tab === 'questions') {
+                document.querySelector('.nav-tab:nth-child(1)').classList.add('active');
+                document.getElementById('view-questions').classList.add('active');
+            } else {
+                document.querySelector('.nav-tab:nth-child(2)').classList.add('active');
+                document.getElementById('view-deadlines').classList.add('active');
+            }
         }
 
-        function updateSubjectDropdown() {
-            const select = document.getElementById('subject-select');
-            let currentVal = select.value;
-            select.innerHTML = '';
+        function renderDirectory() {
+            const container = document.getElementById('subject-directory');
+            container.innerHTML = '';
 
             let subjects = Object.keys(globalData);
             if (subjects.length === 0) {
-                select.innerHTML = '<option value="">Chưa có dữ liệu</option>';
-                document.getElementById('question-list').innerHTML = `<tr><td colspan="4" class="loading">Chưa có câu hỏi nào trên mây!</td></tr>`;
+                container.innerHTML = `<div class="loading">Chưa có dữ liệu câu hỏi nào trên mây!</div>`;
                 return;
             }
 
+            // Gom nhóm môn học theo kỳ
+            let grouped = { "Kỳ 1": [], "Kỳ Khác / Mới Cập Nhật": [] };
+            
             subjects.forEach(sub => {
                 let count = Object.keys(globalData[sub].correct || {}).length + Object.keys(globalData[sub].wrong || {}).length;
-                let opt = document.createElement('option');
-                opt.value = sub;
-                opt.innerText = `${sub} (${count} câu)`;
-                select.appendChild(opt);
+                let foundSem = false;
+                for (let [sem, list] of Object.entries(semesterMapping)) {
+                    if (list.includes(sub)) {
+                        if (!grouped[sem]) grouped[sem] = [];
+                        grouped[sem].push({ name: sub, count });
+                        foundSem = true;
+                        break;
+                    }
+                }
+                if (!foundSem) {
+                    grouped["Kỳ Khác / Mới Cập Nhật"].push({ name: sub, count });
+                }
             });
 
-            if (currentVal && subjects.includes(currentVal)) {
-                select.value = currentVal;
+            for (let [sem, list] of Object.entries(grouped)) {
+                if (list.length === 0) continue;
+                let semBox = document.createElement('div');
+                semBox.className = 'semester-box';
+                semBox.innerHTML = `<div class="semester-title">📂 ${sem}</div>`;
+                
+                let grid = document.createElement('div');
+                grid.className = 'subject-grid';
+
+                list.forEach(item => {
+                    let card = document.createElement('div');
+                    card.className = 'subject-card';
+                    card.innerHTML = `<h3>📖 ${item.name}</h3><p>📊 Tổng số: <b>${item.count}</b> câu hỏi</p>`;
+                    card.onclick = () => openSubject(item.name);
+                    grid.appendChild(card);
+                });
+
+                semBox.appendChild(grid);
+                container.appendChild(semBox);
             }
-            renderTable();
         }
 
-        function switchTab(tab) {
-            currentTab = tab;
-            if (tab === 'correct') {
-                document.getElementById('btn-tab-correct').className = 'tab-btn active-correct';
-                document.getElementById('btn-tab-wrong').className = 'tab-btn';
-            } else {
-                document.getElementById('btn-tab-correct').className = 'tab-btn';
-                document.getElementById('btn-tab-wrong').className = 'tab-btn active-wrong';
-            }
-            renderTable();
+        function openSubject(subName) {
+            activeSubject = subName;
+            document.getElementById('subject-directory').style.display = 'none';
+            document.getElementById('question-workspace').style.display = 'block';
+            document.getElementById('active-subject-title').innerText = `📖 Môn: ${subName}`;
+            renderQuestionsTable();
         }
 
-        function renderTable() {
-            const select = document.getElementById('subject-select');
-            const sub = select.value;
+        function backToDirectory() {
+            document.getElementById('question-workspace').style.display = 'none';
+            document.getElementById('subject-directory').style.display = 'block';
+        }
+
+        function switchQuestionTab(tab) {
+            currentQuestionTab = tab;
+            renderQuestionsTable();
+        }
+
+        function renderQuestionsTable() {
             const tbody = document.getElementById('question-list');
             tbody.innerHTML = '';
 
-            if (!sub || !globalData[sub]) {
-                tbody.innerHTML = `<tr><td colspan="4" class="loading">Không có dữ liệu cho môn này!</td></tr>`;
-                return;
-            }
+            if (!activeSubject || !globalData[activeSubject]) return;
 
-            let targetList = globalData[sub][currentTab] || {};
+            let targetList = globalData[activeSubject][currentQuestionTab] || {};
             let keys = Object.keys(targetList);
 
             if (keys.length === 0) {
-                targetList = Object.assign({}, globalData[sub].correct || {}, globalData[sub].wrong || {});
+                targetList = Object.assign({}, globalData[activeSubject].correct || {}, globalData[activeSubject].wrong || {});
                 keys = Object.keys(targetList);
             }
 
             if (keys.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="loading">Kho dữ liệu trống!</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" class="loading">Không có câu hỏi nào trong kho này!</td></tr>`;
                 return;
             }
 
@@ -241,60 +286,120 @@
                 tr.innerHTML = `
                     <td style="text-align: center; font-weight: bold; color: #555;">${index + 1}</td>
                     <td>${q}</td>
-                    <td><b>Đáp án:</b> <span style="color: #28a745;">${ansVal}</span><br><small style="color:#666;">Lựa chọn: ${optVal}</small></td>
+                    <td><b>Đáp án:</b> <span style="color: var(--success);">${ansVal}</span><br><small style="color:#666;">Lựa chọn: ${optVal}</small></td>
                     <td style="text-align: center;">
-                        <button class="btn-danger" style="padding: 5px 8px; font-size: 12px;" onclick="deleteQuestion('${sub}', '${q.replace(/'/g, "\\'")}')">Xóa</button>
+                        <button class="btn-danger" style="padding: 5px 8px; font-size: 12px;" onclick="deleteQuestion('${activeSubject}', '${q.replace(/'/g, "\\'")}')">Xóa</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
         }
 
-        document.getElementById('subject-select').onchange = renderTable;
-
         async function deleteQuestion(sub, q) {
-            if (confirm('Bạn có chắc muốn xóa câu hỏi này khỏi mây chung?')) {
+            if (confirm('Xóa câu hỏi này khỏi mây chung?')) {
                 let cleanQ = q.includes(' [') ? q.split(' [')[0] : q;
                 await supabaseClient.from('question_banks').delete().eq('subject', sub).eq('question', cleanQ);
-                loadData();
+                loadData().then(() => openSubject(sub));
             }
         }
 
         async function deleteSubject() {
-            const sub = document.getElementById('subject-select').value;
-            if (!sub) return;
-            if (confirm(`Xóa toàn bộ dữ liệu môn [${sub}] trên mây chung?`)) {
-                await supabaseClient.from('question_banks').delete().eq('subject', sub);
+            if (!activeSubject) return;
+            if (confirm(`Xóa toàn bộ dữ liệu môn [${activeSubject}] trên mây chung?`)) {
+                await supabaseClient.from('question_banks').delete().eq('subject', activeSubject);
+                backToDirectory();
                 loadData();
             }
         }
 
-        function exportWord() {
-            const sub = document.getElementById('subject-select').value;
-            if (!sub || !globalData[sub]) return;
-            let correctList = Object.assign({}, globalData[sub].correct || {}, globalData[sub].wrong || {});
-            let keys = Object.keys(correctList);
-            if (keys.length === 0) {
-                alert('Kho dữ liệu của môn này đang trống để xuất Word!');
+        // QUẢN LÝ DEADLINES TRÊN SUPABASE
+        async function loadDeadlines() {
+            let { data } = await supabaseClient.from('deadlines').select('*');
+            const tbody = document.getElementById('deadline-list');
+            tbody.innerHTML = '';
+
+            if (!data || data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="loading">Chưa có lịch deadlines nào.</td></tr>`;
                 return;
             }
 
+            data.forEach(item => {
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><b>${item.title}</b></td>
+                    <td>${new Date(item.due_date).toLocaleString('vi-VN')}</td>
+                    <td style="text-align: center;"><button class="btn-danger" style="padding:4px 8px; font-size:12px;" onclick="deleteDeadline('${item.id}')">Xóa</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function addDeadline() {
+            let title = document.getElementById('dl-title').value.trim();
+            let dueDate = document.getElementById('dl-time').value;
+            if (!title || !dueDate) {
+                alert('Vui lòng nhập đầy đủ tiêu đề và thời gian hạn chót!');
+                return;
+            }
+            await supabaseClient.from('deadlines').insert([{ title, due_date: dueDate }]);
+            document.getElementById('dl-title').value = '';
+            document.getElementById('dl-time').value = '';
+            loadDeadlines();
+        }
+
+        async function deleteDeadline(id) {
+            await supabaseClient.from('deadlines').delete().eq('id', id);
+            loadDeadlines();
+        }
+
+        async function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const jsonData = JSON.parse(e.target.result);
+                    alert('Đang nhập dữ liệu lên mây...');
+                    let records = [];
+                    for (let [sub, content] of Object.entries(jsonData)) {
+                        let correctDict = content.correct || content;
+                        for (let [q, info] of Object.entries(correctDict)) {
+                            let ans = info.correct || info;
+                            let opts = info.options || [];
+                            if (q && ans) {
+                                records.push({ subject: sub, question: q, correct_answer: ans, options: opts, status: 'correct', updated_at: new Date().toISOString() });
+                            }
+                        }
+                    }
+                    for (let i = 0; i < records.length; i += 50) {
+                        await supabaseClient.from('question_banks').upsert(records.slice(i, i + 50), { onConflict: 'subject,question' });
+                    }
+                    alert('✨ Nhập dữ liệu thành công!');
+                    loadData();
+                } catch (err) { alert('Lỗi: ' + err.message); }
+            };
+            reader.readAsText(file);
+        }
+
+        function exportWord() {
+            if (!activeSubject || !globalData[activeSubject]) return;
+            let correctList = Object.assign({}, globalData[activeSubject].correct || {}, globalData[activeSubject].wrong || {});
+            let keys = Object.keys(correctList);
+            if (keys.length === 0) { alert('Kho trống!'); return; }
+
             let html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-            <head><meta charset='utf-8'><title>${sub}</title></head>
+            <head><meta charset='utf-8'><title>${activeSubject}</title></head>
             <body style="font-family:'Times New Roman'; font-size:13pt; line-height: 1.4;">
-            <h1 style="text-align:center; color:#0056b3;">ĐÁP ÁN ÔN TẬP: ${sub.toUpperCase()}</h1><hr>`;
+            <h1 style="text-align:center; color:#0056b3;">ĐÁP ÁN ÔN TẬP: ${activeSubject.toUpperCase()}</h1><hr>`;
 
             keys.forEach((q, idx) => {
                 let item = correctList[q];
                 let displayQ = q.includes(' [') ? q.split(' [')[0] : q;
-                html += `<div style="margin-bottom:15px;">
-                    <b>Câu ${idx+1}:</b> ${displayQ}<br>`;
-                
+                html += `<div style="margin-bottom:15px;"><b>Câu ${idx+1}:</b> ${displayQ}<br>`;
                 if (item.options && item.options.length > 0) {
                     item.options.forEach((opt, oIdx) => {
                         let optLetter = String.fromCharCode(65 + oIdx);
-                        let isCorrect = opt.trim().toLowerCase() === item.correct.trim().toLowerCase();
-                        if (isCorrect) {
+                        if (opt.trim().toLowerCase() === item.correct.trim().toLowerCase()) {
                             html += `<span style="color: #008000; font-weight: bold;">&nbsp;&nbsp;&nbsp;&nbsp;${optLetter}. ${opt} (Đúng)</span><br>`;
                         } else {
                             html += `&nbsp;&nbsp;&nbsp;&nbsp;${optLetter}. ${opt}<br>`;
@@ -311,26 +416,7 @@
             let url = URL.createObjectURL(blob);
             let a = document.createElement('a');
             a.href = url;
-            a.download = `On_Tap_${sub.replace(/\s+/g, '_')}.doc`;
-            a.click();
-        }
-
-        function exportAllJSON() {
-            let exportObj = {};
-            for (let sub of Object.keys(globalData)) {
-                exportObj[sub] = { correct: {}, wrong: {} };
-                for (let q of Object.keys(globalData[sub].correct || {})) {
-                    exportObj[sub].correct[q] = globalData[sub].correct[q];
-                }
-                for (let q of Object.keys(globalData[sub].wrong || {})) {
-                    exportObj[sub].wrong[q] = globalData[sub].wrong[q];
-                }
-            }
-
-            let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
-            let a = document.createElement('a');
-            a.href = dataStr;
-            a.download = "Kho_Dap_An_Backup_Full.json";
+            a.download = `On_Tap_${activeSubject.replace(/\s+/g, '_')}.doc`;
             a.click();
         }
 
