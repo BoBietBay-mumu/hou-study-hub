@@ -149,12 +149,30 @@
         async function loadDirectory() {
             document.getElementById('total-badge').innerText = 'Đang đồng bộ...';
             try {
-                // Chỉ lấy cột subject và status để đếm siêu nhanh, không tải thô toàn bộ câu hỏi
-                let { data, error } = await supabaseClient.from('question_banks').select('subject, status').range(0, 9999);
-                if (error) throw error;
+                // Vòng lặp phân trang tự động quét sạch 100% toàn bộ bản ghi trên mây không giới hạn 1000 dòng
+                let allItems = [];
+                let step = 1000;
+                let from = 0;
+                let fetchMore = true;
+
+                while (fetchMore) {
+                    let { data, error } = await supabaseClient
+                        .from('question_banks')
+                        .select('subject, status')
+                        .range(from, from + step - 1);
+
+                    if (error) throw error;
+                    if (data && data.length > 0) {
+                        allItems = allItems.concat(data);
+                        from += step;
+                        if (data.length < step) fetchMore = false;
+                    } else {
+                        fetchMore = false;
+                    }
+                }
 
                 subjectStats = {};
-                (data || []).forEach(item => {
+                allItems.forEach(item => {
                     let subName = (item.subject || "Chung").trim();
                     if (!subjectStats[subName]) {
                         subjectStats[subName] = { correct: 0, wrong: 0 };
@@ -169,13 +187,12 @@
 
                 renderDirectory();
                 loadDeadlines();
-                document.getElementById('total-badge').innerText = `Kết nối mây thành công!`;
+                document.getElementById('total-badge').innerText = `Kết nối mây thành công! (${allItems.length} câu)`;
             } catch (err) {
                 console.error("Lỗi load data:", err);
                 document.getElementById('total-badge').innerText = 'Lỗi kết nối';
             }
         }
-
         function switchMainTab(tab) {
             document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.section-view').forEach(v => v.classList.remove('active'));
