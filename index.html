@@ -95,12 +95,17 @@
                     if (!globalData[item.subject]) {
                         globalData[item.subject] = { correct: {}, wrong: {} };
                     }
-                    let status = item.status || 'correct';
+                    let status = item.status && item.status.trim() !== '' ? item.status.trim() : 'correct';
                     let opts = item.options;
                     if (typeof opts === 'string') {
                         try { opts = JSON.parse(opts); } catch(e) { opts = []; }
                     }
-                    globalData[item.subject][status][item.question] = {
+                    // Đảm bảo không bị ghi đè nếu trùng câu nhưng khác đáp án
+                    let qKey = item.question;
+                    if (globalData[item.subject][status][qKey]) {
+                        qKey = `${item.question} [${item.correct_answer}]`;
+                    }
+                    globalData[item.subject][status][qKey] = {
                         correct: item.correct_answer,
                         options: Array.isArray(opts) ? opts : []
                     };
@@ -211,17 +216,26 @@
             let targetList = globalData[sub][currentTab] || {};
             let keys = Object.keys(targetList);
 
+            // Tự động gom gộp hiển thị tất cả nếu tab hiện tại trống nhưng tổng kho có dữ liệu
             if (keys.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="3" class="loading">${currentTab === 'correct' ? 'Kho Đúng' : 'Kho Sai'} trống!</td></tr>`;
+                targetList = Object.assign({}, globalData[sub].correct || {}, globalData[sub].wrong || {});
+                keys = Object.keys(targetList);
+            }
+
+            if (keys.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="loading">Kho dữ liệu trống!</td></tr>`;
                 return;
             }
 
             keys.forEach(q => {
                 let item = targetList[q];
                 let tr = document.createElement('tr');
+                let ansVal = typeof item === 'object' ? item.correct : item;
+                let optVal = typeof item === 'object' && item.options ? item.options.join(' | ') : '';
+
                 tr.innerHTML = `
                     <td>${q}</td>
-                    <td><b>Đáp án:</b> <span style="color: ${currentTab === 'correct' ? '#28a745' : '#dc3545'};">${item.correct}</span><br><small style="color:#666;">Lựa chọn: ${item.options ? item.options.join(' | ') : ''}</small></td>
+                    <td><b>Đáp án:</b> <span style="color: #28a745;">${ansVal}</span><br><small style="color:#666;">Lựa chọn: ${optVal}</small></td>
                     <td style="text-align: center;">
                         <button class="btn-danger" style="padding: 5px 8px; font-size: 12px;" onclick="deleteQuestion('${sub}', '${q.replace(/'/g, "\\'")}')">Xóa</button>
                     </td>
@@ -234,7 +248,8 @@
 
         async function deleteQuestion(sub, q) {
             if (confirm('Bạn có chắc muốn xóa câu hỏi này khỏi mây chung?')) {
-                await supabaseClient.from('question_banks').delete().eq('subject', sub).eq('question', q);
+                let cleanQ = q.includes(' [') ? q.split(' [')[0] : q;
+                await supabaseClient.from('question_banks').delete().eq('subject', sub).eq('question', cleanQ);
                 loadData();
             }
         }
@@ -251,10 +266,10 @@
         function exportWord() {
             const sub = document.getElementById('subject-select').value;
             if (!sub || !globalData[sub]) return;
-            let correctList = globalData[sub].correct || {};
+            let correctList = Object.assign({}, globalData[sub].correct || {}, globalData[sub].wrong || {});
             let keys = Object.keys(correctList);
             if (keys.length === 0) {
-                alert('Kho Đúng của môn này đang trống để xuất Word!');
+                alert('Kho dữ liệu của môn này đang trống để xuất Word!');
                 return;
             }
 
@@ -265,8 +280,9 @@
 
             keys.forEach((q, idx) => {
                 let item = correctList[q];
+                let displayQ = q.includes(' [') ? q.split(' [')[0] : q;
                 html += `<div style="margin-bottom:15px;">
-                    <b>Câu ${idx+1}:</b> ${q}<br>`;
+                    <b>Câu ${idx+1}:</b> ${displayQ}<br>`;
                 
                 if (item.options && item.options.length > 0) {
                     item.options.forEach((opt, oIdx) => {
