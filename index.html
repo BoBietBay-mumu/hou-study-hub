@@ -46,6 +46,16 @@
         th { background: var(--primary); color: white; }
         tr:nth-child(even) { background: #f9f9f9; }
         .loading { text-align: center; padding: 30px; font-weight: bold; color: #666; }
+
+        /* Giao diện Lịch Tháng Trực Quan */
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: #fff; padding: 10px; border-radius: 8px; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+        .calendar-weekday { background: var(--primary); color: white; text-align: center; font-weight: bold; padding: 10px; border-radius: 6px; font-size: 14px; }
+        .calendar-cell { background: #fff; border: 1px solid #dee2e6; min-height: 110px; border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 4px; position: relative; }
+        .calendar-cell.empty { background: #f8f9fa; opacity: 0.5; }
+        .calendar-day-num { font-weight: bold; font-size: 14px; color: #495057; }
+        .deadline-badge { background: #ffe3e3; color: #c92a2a; border-left: 3px solid #e03131; font-size: 11px; padding: 3px 6px; border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+        .deadline-badge:hover { background: #ffc9c9; }
     </style>
 </head>
 <body>
@@ -62,7 +72,7 @@
 
         <div class="main-nav">
             <button class="nav-tab active" onclick="switchMainTab('questions')">📖 Ngân Hàng Câu Hỏi</button>
-            <button class="nav-tab" onclick="switchMainTab('deadlines')">📅 Lịch & Deadlines</button>
+            <button class="nav-tab" onclick="switchMainTab('deadlines')">📅 Lịch & Deadlines (Theo Tháng)</button>
         </div>
 
         <!-- TAB 1: NGÂN HÀNG CÂU HỎI -->
@@ -108,35 +118,32 @@
             </div>
         </div>
 
-        <!-- TAB 2: LỊCH VÀ DEADLINES -->
+        <!-- TAB 2: LỊCH VÀ DEADLINES THEO THÁNG -->
         <div id="view-deadlines" class="section-view">
-            <h2>📅 Quản Lý Lịch Học & Hạn Nộp Bài (Deadlines)</h2>
-            <div class="controls">
-                <div style="display: flex; gap: 10px; align-items: center; width: 100%;">
-                    <input type="text" id="dl-title" placeholder="Tên môn / Nội dung hạn nộp..." style="flex: 2;">
-                    <input type="datetime-local" id="dl-time" style="flex: 1;">
-                    <button class="btn-success" onclick="addDeadline()">➕ Thêm Lịch Mới</button>
-                </div>
+            <div class="calendar-header">
+                <button class="btn-success" onclick="changeMonth(-1)">◀ Tháng trước</button>
+                <h2 id="calendar-month-title" style="margin: 0; color: var(--primary);">Tháng 10 2026</h2>
+                <button class="btn-success" onclick="changeMonth(1)">Tháng sau ▶</button>
             </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 60%;">Nội dung công việc / Môn học</th>
-                        <th style="width: 30%;">Thời gian hạn chót</th>
-                        <th style="width: 10%; text-align: center;">Thao tác</th>
-                    </tr>
-                </thead>
-                <tbody id="deadline-list">
-                    <tr><td colspan="3" class="loading">Chưa có lịch nào được lưu.</td></tr>
-                </tbody>
-            </table>
+
+            <div class="calendar-grid">
+                <div class="calendar-weekday">T2</div>
+                <div class="calendar-weekday">T3</div>
+                <div class="calendar-weekday">T4</div>
+                <div class="calendar-weekday">T5</div>
+                <div class="calendar-weekday">T6</div>
+                <div class="calendar-weekday">T7</div>
+                <div class="calendar-weekday">CN</div>
+            </div>
+            <div id="calendar-days-container" class="calendar-grid" style="margin-top: 8px;">
+                <!-- Render ô lịch ngày bằng JS -->
+            </div>
         </div>
     </div>
 
     <script>
         const SUPABASE_URL = 'https://pbyrzmmetkvvqyodzkxo.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_hEzd_AChOmjjJ8fdPdFE9Q_msO0rQin';
-        
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         
         let subjectStats = {}; 
@@ -145,43 +152,34 @@
         let currentQuestionTab = 'correct';
         let semesters = JSON.parse(localStorage.getItem('hou_semesters') || '["Kỳ 1", "Kỳ 2", "Kỳ 3"]');
         let subjectSemesterMap = JSON.parse(localStorage.getItem('hou_subject_map') || '{}');
+        
+        let allDeadlines = [];
+        let currentCalendarYear = 2026;
+        let currentCalendarMonth = 9; // Tháng 10 (0-indexed)
 
         async function loadDirectory() {
             document.getElementById('total-badge').innerText = 'Đang đồng bộ...';
             try {
                 let allItems = [];
-                let step = 1000;
-                let from = 0;
-                let fetchMore = true;
+                let step = 1000, from = 0, fetchMore = true;
 
                 while (fetchMore) {
-                    let { data, error } = await supabaseClient
-                        .from('question_banks')
-                        .select('subject, status')
-                        .range(from, from + step - 1);
-
+                    let { data, error } = await supabaseClient.from('question_banks').select('subject, status').range(from, from + step - 1);
                     if (error) throw error;
                     if (data && data.length > 0) {
                         allItems = allItems.concat(data);
                         from += step;
                         if (data.length < step) fetchMore = false;
-                    } else {
-                        fetchMore = false;
-                    }
+                    } else { fetchMore = false; }
                 }
 
                 subjectStats = {};
                 allItems.forEach(item => {
                     let subName = (item.subject || "Chung").trim();
-                    if (!subjectStats[subName]) {
-                        subjectStats[subName] = { correct: 0, wrong: 0 };
-                    }
+                    if (!subjectStats[subName]) subjectStats[subName] = { correct: 0, wrong: 0 };
                     let status = item.status && item.status.trim() !== '' ? item.status.trim() : 'correct';
-                    if (status === 'wrong') {
-                        subjectStats[subName].wrong++;
-                    } else {
-                        subjectStats[subName].correct++;
-                    }
+                    if (status === 'wrong') subjectStats[subName].wrong++;
+                    else subjectStats[subName].correct++;
                 });
 
                 renderDirectory();
@@ -203,6 +201,7 @@
             } else {
                 document.querySelector('.nav-tab:nth-child(2)').classList.add('active');
                 document.getElementById('view-deadlines').classList.add('active');
+                renderCalendarGrid();
             }
         }
 
@@ -226,7 +225,6 @@
         function renderDirectory() {
             const container = document.getElementById('subject-directory');
             container.innerHTML = '';
-
             let subjects = Object.keys(subjectStats);
             if (subjects.length === 0) {
                 container.innerHTML = `<div class="loading">Chưa có dữ liệu câu hỏi nào trên mây!</div>`;
@@ -240,13 +238,9 @@
             subjects.forEach(sub => {
                 let stats = subjectStats[sub];
                 let totalCount = stats.correct + stats.wrong;
-
                 let sem = subjectSemesterMap[sub];
-                if (sem && grouped[sem]) {
-                    grouped[sem].push({ name: sub, count: totalCount });
-                } else {
-                    unassigned.push({ name: sub, count: totalCount });
-                }
+                if (sem && grouped[sem]) grouped[sem].push({ name: sub, count: totalCount });
+                else unassigned.push({ name: sub, count: totalCount });
             });
 
             if (unassigned.length > 0) {
@@ -259,16 +253,13 @@
                 let semBox = document.createElement('div');
                 semBox.className = 'semester-box';
                 semBox.innerHTML = `<div class="semester-title">📂 ${sem}</div>`;
-                
                 let grid = document.createElement('div');
                 grid.className = 'subject-grid';
 
                 list.forEach(item => {
                     let card = document.createElement('div');
                     card.className = 'subject-card';
-                    
                     let semOptions = semesters.map(s => `<option value="${s}" ${subjectSemesterMap[item.name] === s ? 'selected' : ''}>${s}</option>`).join('');
-
                     card.innerHTML = `
                         <h3 onclick="openSubject('${item.name.replace(/'/g, "\\'")}')">📖 ${item.name}</h3>
                         <p>📊 Tổng số: <b>${item.count}</b> câu hỏi</p>
@@ -279,7 +270,6 @@
                     `;
                     grid.appendChild(card);
                 });
-
                 semBox.appendChild(grid);
                 container.appendChild(semBox);
             }
@@ -292,35 +282,20 @@
             document.getElementById('question-workspace').style.display = 'block';
             document.getElementById('active-subject-title').innerText = `📖 Môn: ${subName}`;
             document.getElementById('question-list').innerHTML = `<tr><td colspan="4" class="loading">Đang tải chi tiết câu hỏi...</td></tr>`;
-            
             updateTabButtonUI();
 
             try {
-                let { data, error } = await supabaseClient
-                    .from('question_banks')
-                    .select('*')
-                    .eq('subject', subName);
-
+                let { data, error } = await supabaseClient.from('question_banks').select('*').eq('subject', subName);
                 if (error) throw error;
-
                 activeSubjectData = { correct: {}, wrong: {} };
                 (data || []).forEach(item => {
                     let status = item.status && item.status.trim() !== '' ? item.status.trim() : 'correct';
                     let opts = item.options;
-                    if (typeof opts === 'string') {
-                        try { opts = JSON.parse(opts); } catch(e) { opts = []; }
-                    }
-                    
-                    let qKey = item.question;
-                    activeSubjectData[status][qKey] = {
-                        correct: item.correct_answer,
-                        options: Array.isArray(opts) ? opts : []
-                    };
+                    if (typeof opts === 'string') { try { opts = JSON.parse(opts); } catch(e) { opts = []; } }
+                    activeSubjectData[status][item.question] = { correct: item.correct_answer, options: Array.isArray(opts) ? opts : [] };
                 });
-
                 renderQuestionsTable();
             } catch (err) {
-                console.error("Lỗi tải chi tiết môn:", err);
                 document.getElementById('question-list').innerHTML = `<tr><td colspan="4" class="loading" style="color:red;">Lỗi tải dữ liệu môn này!</td></tr>`;
             }
         }
@@ -352,7 +327,6 @@
         function renderQuestionsTable() {
             const tbody = document.getElementById('question-list');
             tbody.innerHTML = '';
-
             let targetList = activeSubjectData[currentQuestionTab] || {};
             let keys = Object.keys(targetList);
 
@@ -366,10 +340,8 @@
                 let tr = document.createElement('tr');
                 let ansVal = typeof item === 'object' ? item.correct : item;
                 let optVal = typeof item === 'object' && item.options ? item.options.join(' | ') : '';
-
                 let actionHtml = `<button class="btn-danger" style="padding: 5px 8px; font-size: 12px;" onclick="deleteQuestion('${activeSubject}', '${q.replace(/'/g, "\\'")}')">Xóa</button>`;
                 
-                // Nếu đang ở Kho Sai, thêm nút Sửa & Chuyển sang Kho Đúng
                 if (currentQuestionTab === 'wrong') {
                     actionHtml = `
                         <div style="display: flex; flex-direction: column; gap: 5px; align-items: center;">
@@ -389,23 +361,11 @@
             });
         }
 
-        // Tính năng sửa đáp án và chuyển sang Kho Đúng
         async function fixAndMoveToCorrect(sub, q) {
             let newAns = prompt("Nhập đáp án đúng chuẩn xác sau khi tra cứu:", "");
             if (!newAns) return;
-
-            let { error } = await supabaseClient
-                .from('question_banks')
-                .update({ correct_answer: newAns, status: 'correct', updated_at: new Date().toISOString() })
-                .eq('subject', sub)
-                .eq('question', q);
-
-            if (error) {
-                alert('Lỗi cập nhật!');
-            } else {
-                alert('✨ Đã cập nhật đáp án và chuyển sang Kho Đúng thành công!');
-                openSubject(sub);
-            }
+            let { error } = await supabaseClient.from('question_banks').update({ correct_answer: newAns, status: 'correct', updated_at: new Date().toISOString() }).eq('subject', sub).eq('question', q);
+            if (!error) { alert('✨ Đã cập nhật đáp án và chuyển sang Kho Đúng!'); openSubject(sub); }
         }
 
         async function deleteQuestion(sub, q) {
@@ -425,36 +385,57 @@
 
         async function loadDeadlines() {
             let { data } = await supabaseClient.from('deadlines').select('*');
-            const tbody = document.getElementById('deadline-list');
-            tbody.innerHTML = '';
-            if (!data || data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="3" class="loading">Chưa có lịch deadlines nào.</td></tr>`;
-                return;
+            allDeadlines = data || [];
+            renderCalendarGrid();
+        }
+
+        function changeMonth(direction) {
+            currentCalendarMonth += direction;
+            if (currentCalendarMonth > 11) { currentCalendarMonth = 0; currentCalendarYear++; }
+            else if (currentCalendarMonth < 0) { currentCalendarMonth = 11; currentCalendarYear--; }
+            renderCalendarGrid();
+        }
+
+        function renderCalendarGrid() {
+            const monthNames = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"];
+            document.getElementById('calendar-month-title').innerText = `${monthNames[currentCalendarMonth]} ${currentCalendarYear}`;
+
+            const container = document.getElementById('calendar-days-container');
+            container.innerHTML = '';
+
+            let firstDayIndex = new Date(currentCalendarYear, currentCalendarMonth, 1).getDay();
+            let totalDays = new Date(currentCalendarYear, currentCalendarMonth + 1, 0).getDate();
+            let startDay = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+
+            let prevDays = new Date(currentCalendarYear, currentCalendarMonth, 0).getDate();
+            for (let i = startDay - 1; i >= 0; i--) {
+                let cell = document.createElement('div');
+                cell.className = 'calendar-cell empty';
+                cell.innerHTML = `<div class="calendar-day-num" style="color:#adb5bd;">${prevDays - i}</div>`;
+                container.appendChild(cell);
             }
-            data.forEach(item => {
-                let tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><b>${item.title}</b></td>
-                    <td>${new Date(item.due_date).toLocaleString('vi-VN')}</td>
-                    <td style="text-align: center;"><button class="btn-danger" style="padding:4px 8px; font-size:12px;" onclick="deleteDeadline('${item.id}')">Xóa</button></td>
+
+            for (let day = 1; day <= totalDays; day++) {
+                let cell = document.createElement('div');
+                cell.className = 'calendar-cell';
+                
+                let dayStr = String(day).padStart(2, '0');
+                let monthStr = String(currentCalendarMonth + 1).padStart(2, '0');
+                let dateKey = `${currentCalendarYear}-${monthStr}-${dayStr}`;
+
+                let matchedDeadlines = allDeadlines.filter(d => {
+                    let dTime = d.deadline_time || '';
+                    return dTime.includes(`Ngày ${day}`) || dTime.includes(dateKey) || dTime.includes(`${currentCalendarMonth + 1}/${day}`);
+                });
+
+                let deadlinesHtml = matchedDeadlines.map(d => `<div class="deadline-badge" title="${d.title}">📌 ${d.title}</div>`).join('');
+
+                cell.innerHTML = `
+                    <div class="calendar-day-num">${day}</div>
+                    <div style="display:flex; flex-direction:column; gap:3px; overflow-y:auto; max-height:80px;">${deadlinesHtml}</div>
                 `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        async function addDeadline() {
-            let title = document.getElementById('dl-title').value.trim();
-            let dueDate = document.getElementById('dl-time').value;
-            if (!title || !dueDate) { alert('Vui lòng nhập đầy đủ!'); return; }
-            await supabaseClient.from('deadlines').insert([{ title, due_date: dueDate }]);
-            document.getElementById('dl-title').value = '';
-            document.getElementById('dl-time').value = '';
-            loadDeadlines();
-        }
-
-        async function deleteDeadline(id) {
-            await supabaseClient.from('deadlines').delete().eq('id', id);
-            loadDeadlines();
+                container.appendChild(cell);
+            }
         }
 
         async function importJSON(event) {
@@ -471,9 +452,7 @@
                         for (let [q, info] of Object.entries(correctDict)) {
                             let ans = info.correct || info;
                             let opts = info.options || [];
-                            if (q && ans) {
-                                records.push({ subject: sub, question: q, correct_answer: ans, options: opts, status: 'correct', updated_at: new Date().toISOString() });
-                            }
+                            if (q && ans) records.push({ subject: sub, question: q, correct_answer: ans, options: opts, status: 'correct', updated_at: new Date().toISOString() });
                         }
                     }
                     for (let i = 0; i < records.length; i += 50) {
