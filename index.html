@@ -78,18 +78,18 @@
 <body>
     <div class="container">
         <h1>
-            📚 HOU LMS Smart Hub
+            📚 HOU LMS Smart Hub (Lịch Pastel iOS)
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <input type="file" id="json-file-input" style="display: none;" accept=".json" onchange="importJSON(event)">
                 <button class="btn-warning" onclick="document.getElementById('json-file-input').click()">📥 Nhập JSON</button>
-                <button class="btn-success" onclick="loadDirectory()" style="padding: 6px 10px; font-size: 12px;">🔄 Tải Lại</button>
+                <button class="btn-success" onclick="loadDirectory()" style="padding: 6px 10px; font-size: 12px;">🔄 Tải Lại Trang Chủ</button>
                 <span id="total-badge" style="font-size: 13px; background: #e5e5ea; color: #1c1c1e; padding: 4px 12px; border-radius: 20px;">Đang kết nối mây...</span>
             </div>
         </h1>
 
         <div class="main-nav">
             <button class="nav-tab active" onclick="switchMainTab('questions')">📖 Ngân Hàng Câu Hỏi</button>
-            <button class="nav-tab" onclick="switchMainTab('deadlines')">📅 Lịch & Deadlines </button>
+            <button class="nav-tab" onclick="switchMainTab('deadlines')">📅 Lịch & Deadlines (Pastel iOS)</button>
         </div>
 
         <!-- TAB 1: NGÂN HÀNG CÂU HỎI -->
@@ -104,7 +104,11 @@
             </div>
 
             <div id="question-workspace" style="display: none; margin-top: 20px;">
-                <button onclick="backToDirectory()" style="margin-bottom: 15px; background: #8e8e93;">⬅️ Quay lại danh sách môn</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                    <button onclick="backToDirectory()" style="background: #8e8e93;">⬅️ Quay lại danh sách môn</button>
+                    <button class="btn-success" onclick="openSubject(activeSubject)">🔄 Tải Lại Môn Này (Cập Nhật Nhanh)</button>
+                </div>
+                
                 <div class="controls">
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                         <h2 id="active-subject-title" style="margin: 0; color: var(--primary);">Môn học</h2>
@@ -307,11 +311,10 @@
 
         async function openSubject(subName) {
             activeSubject = subName;
-            currentQuestionTab = 'correct';
             document.getElementById('subject-directory').style.display = 'none';
             document.getElementById('question-workspace').style.display = 'block';
             document.getElementById('active-subject-title').innerText = `📖 Môn: ${subName}`;
-            document.getElementById('question-list').innerHTML = `<tr><td colspan="4" class="loading">Đang tải chi tiết câu hỏi...</td></tr>`;
+            document.getElementById('question-list').innerHTML = `<tr><td colspan="4" class="loading">Đang tải lại dữ liệu mới nhất từ mây...</td></tr>`;
             updateTabButtonUI();
 
             try {
@@ -331,6 +334,7 @@
         }
 
         function backToDirectory() {
+            activeSubject = '';
             document.getElementById('question-workspace').style.display = 'none';
             document.getElementById('subject-directory').style.display = 'block';
             loadDirectory();
@@ -505,7 +509,7 @@
                             <button class="btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="deleteDeadline('${d.id}', '${d.title.replace(/'/g, "\\'")}')">Xóa</button>
                         </div>
                     `;
-                    listContainer.innerHTML += itemDiv.outerHTML; // Sửa gọn hiển thị
+                    listContainer.innerHTML += itemDiv.outerHTML;
                 });
             }
             document.getElementById('event-modal').style.display = 'flex';
@@ -515,16 +519,13 @@
             document.getElementById('event-modal').style.display = 'none';
         }
 
-        // Tính năng Đăng Ký Lịch Tự Động (Webcal Subscription)
         function subscribeWebcal() {
             let currentUrl = window.location.href;
             let baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
             let webcalUrl = (baseUrl + 'feed.ics').replace('https://', 'webcal://').replace('http://', 'webcal://');
-            
             prompt("Sao chép đường dẫn đăng ký lịch tự động này dán vào ứng dụng Lịch (Apple Calendar / Google Calendar) trên điện thoại:", webcalUrl);
         }
 
-        // Xuất file iCal (.ics) có kèm báo thức nhắc nhở trước 1 ngày cho điện thoại
         function exportCalendarICS() {
             if (!allDeadlines || allDeadlines.length === 0) {
                 alert("Chưa có sự kiện deadline nào để đồng bộ!");
