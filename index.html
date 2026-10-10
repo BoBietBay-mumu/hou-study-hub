@@ -47,15 +47,35 @@
         tr:nth-child(even) { background: #f9f9f9; }
         .loading { text-align: center; padding: 30px; font-weight: bold; color: #666; }
 
-        /* Giao diện Lịch Tháng Trực Quan */
+        /* Giao diện Lịch Tháng Trực Quan & Tối Ưu Hiển Thị */
         .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: #fff; padding: 10px; border-radius: 8px; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
         .calendar-weekday { background: var(--primary); color: white; text-align: center; font-weight: bold; padding: 10px; border-radius: 6px; font-size: 14px; }
-        .calendar-cell { background: #fff; border: 1px solid #dee2e6; min-height: 110px; border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 4px; position: relative; }
+        .calendar-cell { background: #fff; border: 1px solid #dee2e6; min-height: 120px; border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 4px; position: relative; overflow: hidden; }
         .calendar-cell.empty { background: #f8f9fa; opacity: 0.5; }
         .calendar-day-num { font-weight: bold; font-size: 14px; color: #495057; }
-        .deadline-badge { background: #ffe3e3; color: #c92a2a; border-left: 3px solid #e03131; font-size: 11px; padding: 3px 6px; border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-        .deadline-badge:hover { background: #ffc9c9; }
+        
+        /* Cố định kích thước badge, cắt chữ thừa bằng dấu ... và hiện toàn bộ khi rê chuột */
+        .deadline-badge { 
+            background: #ffe3e3; 
+            color: #c92a2a; 
+            border-left: 3px solid #e03131; 
+            font-size: 11px; 
+            padding: 3px 6px; 
+            border-radius: 4px; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            cursor: pointer; 
+            max-width: 100%;
+        }
+        .deadline-badge:hover { 
+            background: #ffc9c9; 
+            white-space: normal; 
+            overflow: visible; 
+            z-index: 10; 
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
     </style>
 </head>
 <body>
@@ -432,7 +452,7 @@
 
                 cell.innerHTML = `
                     <div class="calendar-day-num">${day}</div>
-                    <div style="display:flex; flex-direction:column; gap:3px; overflow-y:auto; max-height:80px;">${deadlinesHtml}</div>
+                    <div style="display:flex; flex-direction:column; gap:3px; overflow-y:auto; max-height:85px;">${deadlinesHtml}</div>
                 `;
                 container.appendChild(cell);
             }
