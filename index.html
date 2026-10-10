@@ -466,11 +466,14 @@
                 let dayNumClass = isToday ? "calendar-day-num today" : "calendar-day-num";
 
                 // Lọc sự kiện theo đúng chuẩn khóa YYYY-MM-DD
+                // Lọc sự kiện theo ngày và loại bỏ trùng lặp hiển thị
                 let matchedDeadlines = allDeadlines.filter(d => (d.deadline_time || '').startsWith(dateKey));
+                let uniqueMatched = Array.from(new Set(matchedDeadlines.map(a => a.title)))
+                    .map(title => matchedDeadlines.find(a => a.title === title));
 
-                let deadlinesHtml = matchedDeadlines.map(d => `
-                    <div class="deadline-badge" title="${d.title} (Click để xóa)" onclick="deleteDeadline('${d.id}', '${d.title.replace(/'/g, "\\'")}')">
-                        ${d.title}
+                let deadlinesHtml = uniqueMatched.map(d => `
+                    <div class="deadline-badge" title="${d.title} - Môn: ${d.course} (Click để xóa)" onclick="deleteDeadline('${d.id}', '${d.title.replace(/'/g, "\\'")}')">
+                        📌 ${d.title} <small style="opacity:0.8;">(${d.course})</small>
                     </div>
                 `).join('');
 
