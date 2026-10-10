@@ -47,7 +47,7 @@
         tr:nth-child(even) { background: #f9f9f9; }
         .loading { text-align: center; padding: 30px; font-weight: bold; color: #666; }
 
-        /* Giao diện Lịch Tháng Trực Quan & Tối Ưu Hiển Thị */
+        /* Giao diện Lịch Tháng Trực Quan */
         .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: #fff; padding: 10px; border-radius: 8px; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
         .calendar-weekday { background: var(--primary); color: white; text-align: center; font-weight: bold; padding: 10px; border-radius: 6px; font-size: 14px; }
@@ -55,7 +55,6 @@
         .calendar-cell.empty { background: #f8f9fa; opacity: 0.5; }
         .calendar-day-num { font-weight: bold; font-size: 14px; color: #495057; }
         
-        /* Cố định kích thước badge, cắt chữ thừa bằng dấu ... và hiện toàn bộ khi rê chuột */
         .deadline-badge { 
             background: #ffe3e3; 
             color: #c92a2a; 
@@ -409,6 +408,19 @@
             renderCalendarGrid();
         }
 
+        // Tính năng mới: Click vào badge deadline để xóa nhanh sự kiện ngay trên web
+        async function deleteDeadline(id, title) {
+            if (confirm(`Bạn có muốn xóa sự kiện [${title}] này không?`)) {
+                let { error } = await supabaseClient.from('deadlines').delete().eq('id', id);
+                if (!error) {
+                    alert('🗑️ Đã xóa sự kiện thành công!');
+                    loadDeadlines();
+                } else {
+                    alert('Lỗi khi xóa sự kiện!');
+                }
+            }
+        }
+
         function changeMonth(direction) {
             currentCalendarMonth += direction;
             if (currentCalendarMonth > 11) { currentCalendarMonth = 0; currentCalendarYear++; }
@@ -448,7 +460,12 @@
                     return dTime.includes(`Ngày ${day}`) || dTime.includes(dateKey) || dTime.includes(`${currentCalendarMonth + 1}/${day}`);
                 });
 
-                let deadlinesHtml = matchedDeadlines.map(d => `<div class="deadline-badge" title="${d.title}">📌 ${d.title}</div>`).join('');
+                // Gắn sự kiện onclick gọi hàm xóa trực tiếp
+                let deadlinesHtml = matchedDeadlines.map(d => `
+                    <div class="deadline-badge" title="${d.title} (Click để xóa)" onclick="deleteDeadline('${d.id}', '${d.title.replace(/'/g, "\\'")}')">
+                        📌 ${d.title}
+                    </div>
+                `).join('');
 
                 cell.innerHTML = `
                     <div class="calendar-day-num">${day}</div>
