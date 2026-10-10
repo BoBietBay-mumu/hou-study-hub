@@ -436,7 +436,7 @@
 
         function renderCalendarGrid() {
             const monthNames = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"];
-            document.getElementById('calendar-month-title').innerText = `${monthNames[currentCalendarMonth]}${currentCalendarYear}`;
+            document.getElementById('calendar-month-title').innerText = `${monthNames[currentCalendarMonth]} ${currentCalendarYear}`;
 
             const container = document.getElementById('calendar-days-container');
             container.innerHTML = '';
@@ -478,7 +478,8 @@
                 cell.onclick = () => openEventModal(dateKey, matchedDeadlines);
 
                 cell.innerHTML = `
-                    <div class="${dayNumClass}">${day}</div>${dotsHtml}
+                    <div class="${dayNumClass}">${day}</div>
+                    ${dotsHtml}
                 `;
                 container.appendChild(cell);
             }
@@ -540,7 +541,7 @@
                 icsContent += `DTSTAMP:${dateStr}T000000Z\n`;
                 icsContent += `DTSTART;VALUE=DATE:${dateStr}\n`;
                 icsContent += `DTEND;VALUE=DATE:${dateStr}\n`;
-                icsContent += `SUMMARY:[${d.course \vert{}\vert{} 'HOU'}]${d.title}\n`;
+                icsContent += `SUMMARY:[${d.course || 'HOU'}] ${d.title}\n`;
                 
                 icsContent += "BEGIN:VALARM\n";
                 icsContent += "TRIGGER:-P1DT15H\n";
@@ -604,15 +605,32 @@
 
             keys.forEach((q, idx) => {
                 let item = correctList[q];
-                html += `<div style="margin-bottom:15px;"><b>Câu ${idx+1}:</b>${q}<br>`;
+                html += `<div style="margin-bottom:15px;"><b>Câu ${idx+1}:</b> ${q}<br>`;
                 if (item.options && item.options.length > 0) {
                     item.options.forEach((opt, oIdx) => {
                         let optLetter = String.fromCharCode(65 + oIdx);
                         if (opt.trim().toLowerCase() === item.correct.trim().toLowerCase()) {
-                            html += `<span style="color: #008000; font-weight: bold;">&nbsp;&nbsp;&nbsp;&nbsp;${optLetter}.${opt} (Đúng)</span><br>`;
+                            html += `<span style="color: #008000; font-weight: bold;">&nbsp;&nbsp;&nbsp;&nbsp;${optLetter}. ${opt} (Đúng)</span><br>`;
                         } else {
-                            html += `&nbsp;&nbsp;&nbsp;&nbsp;${optLetter}.${opt}<br>`;
+                            html += `&nbsp;&nbsp;&nbsp;&nbsp;${optLetter}. ${opt}<br>`;
                         }
                     });
                 } else {
-                    html += `<span style="
+                    html += `<span style="color: #008000; font-weight: bold;">👉 Đáp án: ${item.correct}</span><br>`;
+                }
+                html += `</div>`;
+            });
+            html += `</body></html>`;
+
+            let blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = `On_Tap_${activeSubject.replace(/\s+/g, '_')}.doc`;
+            a.click();
+        }
+
+        loadDirectory();
+    </script>
+</body>
+</html>
