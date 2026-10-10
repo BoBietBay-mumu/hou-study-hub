@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HOU LMS Smart Hub - Lịch Phong Cách iOS & Ngân Hàng Câu Hỏi</title>
+    <title>HOU LMS Smart Hub - Lịch Chuẩn iOS & Ngân Hàng Câu Hỏi</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #007aff; --success: #34c759; --danger: #ff3b30; --warning: #ffcc00; --bg: #f2f2f7; }
@@ -47,42 +47,31 @@
         tr:nth-child(even) { background: #fafafa; }
         .loading { text-align: center; padding: 30px; font-weight: bold; color: #8e8e93; }
 
-        /* Giao diện Lịch chuẩn iOS */
+        /* Giao diện Lịch chuẩn iOS gọn gàng */
         .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #fff; padding: 10px 15px; border-radius: 12px; border: 1px solid #e5e5ea; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
         .calendar-weekday { text-align: center; font-weight: 600; padding: 8px; color: #8e8e93; font-size: 13px; text-transform: uppercase; }
         
-        .calendar-cell { background: #fff; border: 1px solid #e5e5ea; min-height: 110px; border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 4px; position: relative; }
-        .calendar-cell.empty { background: #f9f9fb; opacity: 0.4; }
+        .calendar-cell { background: #fff; border: 1px solid #e5e5ea; min-height: 100px; border-radius: 10px; padding: 8px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; position: relative; cursor: pointer; transition: background 0.2s; }
+        .calendar-cell:hover { background: #f2f2f7; }
+        .calendar-cell.empty { background: #f9f9fb; opacity: 0.4; cursor: default; }
         
-        /* Vòng tròn đỏ cho ngày "Hôm nay" y hệt lịch iOS */
-        .calendar-day-num { font-weight: 600; font-size: 14px; color: #1c1c1e; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+        .calendar-day-num { font-weight: 600; font-size: 14px; color: #1c1c1e; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; margin-bottom: 6px; }
         .calendar-day-num.today { background: var(--danger); color: white; font-weight: bold; }
 
-        /* Huy hiệu deadline phong cách iOS có chấm đỏ báo hiệu */
-        .deadline-badge { 
-            background: #fff2f2; 
-            color: #d70015; 
-            border: 1px solid #ff3b3033;
-            font-size: 11px; 
-            padding: 3px 6px; 
-            border-radius: 6px; 
-            white-space: nowrap; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
-            cursor: pointer; 
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .deadline-badge::before { content: '•'; color: var(--danger); font-size: 16px; font-weight: bold; }
-        .deadline-badge:hover { 
-            background: #ffe1e1; 
-            white-space: normal; 
-            overflow: visible; 
-            z-index: 10; 
-            box-shadow: 0 4px 12px rgba(255,59,48,0.2);
-        }
+        /* Chấm tròn báo hiệu sự kiện y hệt lịch iPhone */
+        .event-dots { display: flex; gap: 3px; justify-content: center; flex-wrap: wrap; margin-top: auto; }
+        .event-dot { width: 6px; height: 6px; background-color: var(--danger); border-radius: 50%; }
+
+        /* Modal Popup chi tiết sự kiện khi bấm vào ngày */
+        #event-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99999; justify-content: center; align-items: center; }
+        .modal-content { background: white; width: 90%; max-width: 500px; padding: 25px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); position: relative; }
+        .modal-close { position: absolute; top: 15px; right: 15px; font-size: 20px; font-weight: bold; cursor: pointer; color: #8e8e93; }
+        .event-item-card { background: #f9f9fb; border-left: 4px solid var(--danger); padding: 12px; border-radius: 8px; margin-bottom: 12px; }
+        .event-item-card h4 { margin: 0 0 5px 0; color: #1c1c1e; font-size: 15px; }
+        .event-item-card p { margin: 0 0 8px 0; font-size: 13px; color: #8e8e93; }
+        .btn-goto { display: inline-block; padding: 6px 12px; background: var(--primary); color: white; text-decoration: none; border-radius: 6px; font-size: 12px; font-weight: 600; }
+        .btn-goto:hover { opacity: 0.9; }
     </style>
 </head>
 <body>
@@ -99,7 +88,7 @@
 
         <div class="main-nav">
             <button class="nav-tab active" onclick="switchMainTab('questions')">📖 Ngân Hàng Câu Hỏi</button>
-            <button class="nav-tab" onclick="switchMainTab('deadlines')">📅 Lịch & Deadlines (Phong Cách iOS)</button>
+            <button class="nav-tab" onclick="switchMainTab('deadlines')">📅 Lịch & Deadlines (Chuẩn iOS)</button>
         </div>
 
         <!-- TAB 1: NGÂN HÀNG CÂU HỎI -->
@@ -145,7 +134,7 @@
             </div>
         </div>
 
-        <!-- TAB 2: LỊCH CHUẨN IOS -->
+        <!-- TAB 2: LỊCH CHUẨN IOS (CHẤM TRÒN & POPUP) -->
         <div id="view-deadlines" class="section-view">
             <div class="calendar-header">
                 <button class="btn-success" onclick="changeMonth(-1)">◀ Tháng trước</button>
@@ -164,6 +153,17 @@
             </div>
             <div id="calendar-days-container" class="calendar-grid" style="margin-top: 6px;">
                 <!-- Render ô lịch ngày bằng JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL POPUP HIỂN THỊ CHI TIẾT SỰ KIỆN TRONG NGÀY -->
+    <div id="event-modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeEventModal()">&times;</span>
+            <h3 id="modal-date-title" style="margin-top: 0; color: var(--primary);">Chi tiết sự kiện</h3>
+            <div id="modal-events-list" style="max-height: 350px; overflow-y: auto;">
+                <!-- Danh sách sự kiện chèn vào đây -->
             </div>
         </div>
     </div>
@@ -419,7 +419,7 @@
         async function deleteDeadline(id, title) {
             if (confirm(`Bạn muốn xóa sự kiện [${title}] này?`)) {
                 let { error } = await supabaseClient.from('deadlines').delete().eq('id', id);
-                if (!error) { alert('🗑️ Đã xóa sự kiện thành công!'); loadDeadlines(); }
+                if (!error) { alert('🗑️ Đã xóa sự kiện thành công!'); closeEventModal(); loadDeadlines(); }
                 else { alert('Lỗi khi xóa sự kiện!'); }
             }
         }
@@ -461,28 +461,57 @@
                 let monthStr = String(currentCalendarMonth + 1).padStart(2, '0');
                 let dateKey = `${currentCalendarYear}-${monthStr}-${dayStr}`;
 
-                // Kiểm tra có phải ngày "Hôm nay" không để bôi tròn đỏ chuẩn iOS
                 let isToday = (dateKey === todayStr);
                 let dayNumClass = isToday ? "calendar-day-num today" : "calendar-day-num";
 
-                // Lọc sự kiện theo đúng chuẩn khóa YYYY-MM-DD
-                // Lọc sự kiện theo ngày và loại bỏ trùng lặp hiển thị
                 let matchedDeadlines = allDeadlines.filter(d => (d.deadline_time || '').startsWith(dateKey));
-                let uniqueMatched = Array.from(new Set(matchedDeadlines.map(a => a.title)))
-                    .map(title => matchedDeadlines.find(a => a.title === title));
 
-                let deadlinesHtml = uniqueMatched.map(d => `
-                    <div class="deadline-badge" title="${d.title} - Môn: ${d.course} (Click để xóa)" onclick="deleteDeadline('${d.id}', '${d.title.replace(/'/g, "\\'")}')">
-                        📌 ${d.title} <small style="opacity:0.8;">(${d.course})</small>
-                    </div>
-                `).join('');
+                // Tạo chấm tròn báo hiệu y hệt lịch iOS nếu ngày đó có sự kiện
+                let dotsHtml = '';
+                if (matchedDeadlines.length > 0) {
+                    dotsHtml = `<div class="event-dots"><div class="event-dot"></div></div>`;
+                }
+
+                // Bấm vào ô ngày sẽ bật popup hiển thị toàn bộ danh sách sự kiện trong ngày đó
+                cell.onclick = () => openEventModal(dateKey, matchedDeadlines);
 
                 cell.innerHTML = `
                     <div class="${dayNumClass}">${day}</div>
-                    <div style="display:flex; flex-direction:column; gap:3px; overflow-y:auto; max-height:80px;">${deadlinesHtml}</div>
+                    ${dotsHtml}
                 `;
                 container.appendChild(cell);
             }
+        }
+
+        // Mở popup chi tiết sự kiện
+        function openEventModal(dateStr, deadlines) {
+            document.getElementById('modal-date-title').innerText = `📅 Sự kiện ngày ${dateStr.split('-').reverse().join('/')}`;
+            const listContainer = document.getElementById('modal-events-list');
+            listContainer.innerHTML = '';
+
+            if (deadlines.length === 0) {
+                listContainer.innerHTML = `<p style="text-align:center; color:#8e8e93;">Không có sự kiện hoặc deadline nào vào ngày này.</p>`;
+            } else {
+                deadlines.forEach(d => {
+                    let itemDiv = document.createElement('div');
+                    itemDiv.className = 'event-item-card';
+                    let linkHref = d.url && d.url.startsWith('http') ? d.url : 'https://lmshub.hou.edu.vn/';
+                    itemDiv.innerHTML = `
+                        <h4>📌 ${d.title}</h4>
+                        <p>📖 Môn học: <b>${d.course || 'Chung'}</b></p>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                            <a href="${linkHref}" target="_blank" class="btn-goto">🔗 Đi tới hoạt động</a>
+                            <button class="btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="deleteDeadline('${d.id}', '${d.title.replace(/'/g, "\\'")}')">Xóa</button>
+                        </div>
+                    `;
+                    listContainer.appendChild(itemDiv);
+                });
+            }
+            document.getElementById('event-modal').style.display = 'flex';
+        }
+
+        function closeEventModal() {
+            document.getElementById('event-modal').style.display = 'none';
         }
 
         async function importJSON(event) {
