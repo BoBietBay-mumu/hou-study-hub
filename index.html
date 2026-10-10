@@ -47,7 +47,6 @@
         tr:nth-child(even) { background: #fafafa; }
         .loading { text-align: center; padding: 30px; font-weight: bold; color: #8e8e93; }
 
-        /* Giao diện Lịch chuẩn iOS với màu nền ô Pastel */
         .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #fff; padding: 10px 15px; border-radius: 12px; border: 1px solid #e5e5ea; flex-wrap: wrap; gap: 10px; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
         .calendar-weekday { text-align: center; font-weight: 600; padding: 8px; color: #8e8e93; font-size: 13px; text-transform: uppercase; }
@@ -64,7 +63,6 @@
         .event-dots { display: flex; gap: 3px; justify-content: center; flex-wrap: wrap; margin-top: auto; }
         .event-dot { width: 6px; height: 6px; background-color: var(--danger); border-radius: 50%; }
 
-        /* Modal Popup chi tiết */
         #event-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99999; justify-content: center; align-items: center; }
         .modal-content { background: white; width: 90%; max-width: 520px; padding: 25px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); position: relative; }
         .modal-close { position: absolute; top: 15px; right: 15px; font-size: 20px; font-weight: bold; cursor: pointer; color: #8e8e93; }
@@ -106,7 +104,7 @@
             <div id="question-workspace" style="display: none; margin-top: 20px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
                     <button onclick="backToDirectory()" style="background: #8e8e93;">⬅️ Quay lại danh sách môn</button>
-                    <button class="btn-success" onclick="openSubject(activeSubject)">🔄 Tải Lại Môn Này (Cập Nhật Nhanh)</button>
+                    <button class="btn-success" onclick="openSubject(activeSubject, false)">🔄 Tải Lại Môn Này (Cập Nhật Nhanh)</button>
                 </div>
                 
                 <div class="controls">
@@ -190,6 +188,21 @@
         let allDeadlines = [];
         let currentCalendarYear = new Date().getFullYear();
         let currentCalendarMonth = new Date().getMonth();
+
+        // LẮNG NGHE SỰ KIỆN NÚT BACK / FORWARD CỦA TRÌNH DUYỆT
+        window.addEventListener('popstate', (event) => {
+            handleRoute();
+        });
+
+        function handleRoute() {
+            let hash = window.location.hash;
+            if (hash.startsWith('#subject=')) {
+                let subName = decodeURIComponent(hash.replace('#subject=', ''));
+                openSubject(subName, true);
+            } else {
+                backToDirectory(true);
+            }
+        }
 
         async function loadDirectory() {
             document.getElementById('total-badge').innerText = 'Đang đồng bộ...';
@@ -295,7 +308,7 @@
                     card.className = 'subject-card';
                     let semOptions = semesters.map(s => `<option value="${s}" ${subjectSemesterMap[item.name] === s ? 'selected' : ''}>${s}</option>`).join('');
                     card.innerHTML = `
-                        <h3 onclick="openSubject('${item.name.replace(/'/g, "\\'")}')">📖 ${item.name}</h3>
+                        <h3 onclick="selectSubject('${item.name.replace(/'/g, "\\'")}')">📖 ${item.name}</h3>
                         <p>📊 Tổng số: <b>${item.count}</b> câu hỏi</p>
                         <div class="card-actions">
                             <small>Đổi kỳ:</small>
@@ -309,12 +322,22 @@
             }
         }
 
-        async function openSubject(subName) {
+        // Khi người dùng bấm vào môn học -> đẩy vào lịch sử trình duyệt
+        function selectSubject(subName) {
+            window.location.hash = `subject=${encodeURIComponent(subName)}`;
+        }
+
+        async function openSubject(subName, isFromHistory = false) {
             activeSubject = subName;
+            if (!isFromHistory && window.location.hash !== `#subject=${encodeURIComponent(subName)}`) {
+                window.location.hash = `subject=${encodeURIComponent(subName)}`;
+                return;
+            }
+
             document.getElementById('subject-directory').style.display = 'none';
             document.getElementById('question-workspace').style.display = 'block';
             document.getElementById('active-subject-title').innerText = `📖 Môn: ${subName}`;
-            document.getElementById('question-list').innerHTML = `<tr><td colspan="4" class="loading">Đang tải lại dữ liệu mới nhất từ mây...</td></tr>`;
+            document.getElementById('question-list').innerHTML = `<tr><td colspan="4" class="loading">Đang tải dữ liệu mới nhất từ mây...</td></tr>`;
             updateTabButtonUI();
 
             try {
@@ -333,8 +356,12 @@
             }
         }
 
-        function backToDirectory() {
+        function backToDirectory(isFromHistory = false) {
             activeSubject = '';
+            if (!isFromHistory && window.location.hash !== '') {
+                window.location.hash = '';
+                return;
+            }
             document.getElementById('question-workspace').style.display = 'none';
             document.getElementById('subject-directory').style.display = 'block';
             loadDirectory();
@@ -399,13 +426,13 @@
             let newAns = prompt("Nhập đáp án đúng chuẩn xác sau khi tra cứu:", "");
             if (!newAns) return;
             let { error } = await supabaseClient.from('question_banks').update({ correct_answer: newAns, status: 'correct', updated_at: new Date().toISOString() }).eq('subject', sub).eq('question', q);
-            if (!error) { alert('✨ Đã cập nhật đáp án và chuyển sang Kho Đúng!'); openSubject(sub); }
+            if (!error) { alert('✨ Đã cập nhật đáp án và chuyển sang Kho Đúng!'); openSubject(sub, true); }
         }
 
         async function deleteQuestion(sub, q) {
             if (confirm('Xóa câu hỏi này khỏi mây chung?')) {
                 await supabaseClient.from('question_banks').delete().eq('subject', sub).eq('question', q);
-                openSubject(sub);
+                openSubject(sub, true);
             }
         }
 
@@ -631,7 +658,12 @@
             a.click();
         }
 
-        loadDirectory();
+        // Khởi chạy ban đầu: kiểm tra xem URL có đang đứng ở môn nào không để load thẳng vào môn đó
+        if (window.location.hash.startsWith('#subject=')) {
+            handleRoute();
+        } else {
+            loadDirectory();
+        }
     </script>
 </body>
 </html>
