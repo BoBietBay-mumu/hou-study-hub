@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HOU LMS Smart Hub - Lịch Pastel Phong Cách iOS</title>
+    <title>HOU LMS Smart Hub - Lịch Pastel iOS & Điện Thoại</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #007aff; --success: #34c759; --danger: #ff3b30; --warning: #ffcc00; --bg: #f2f2f7; }
@@ -48,7 +48,7 @@
         .loading { text-align: center; padding: 30px; font-weight: bold; color: #8e8e93; }
 
         /* Giao diện Lịch chuẩn iOS với màu nền ô Pastel */
-        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #fff; padding: 10px 15px; border-radius: 12px; border: 1px solid #e5e5ea; }
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #fff; padding: 10px 15px; border-radius: 12px; border: 1px solid #e5e5ea; flex-wrap: wrap; gap: 10px; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
         .calendar-weekday { text-align: center; font-weight: 600; padding: 8px; color: #8e8e93; font-size: 13px; text-transform: uppercase; }
         
@@ -56,13 +56,11 @@
         .calendar-cell:hover { opacity: 0.85; transform: scale(1.02); }
         .calendar-cell.empty { background: #f9f9fb; opacity: 0.4; cursor: default; }
         
-        /* Hiệu ứng bôi màu nguyên ô Pastel khi có sự kiện */
         .calendar-cell.has-events { background-color: #fff0f0; border-color: #ffcccc; }
 
         .calendar-day-num { font-weight: 600; font-size: 14px; color: #1c1c1e; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; margin-bottom: 6px; }
         .calendar-day-num.today { background: var(--danger); color: white; font-weight: bold; }
 
-        /* Chấm báo hiệu sự kiện tinh tế */
         .event-dots { display: flex; gap: 3px; justify-content: center; flex-wrap: wrap; margin-top: auto; }
         .event-dot { width: 6px; height: 6px; background-color: var(--danger); border-radius: 50%; }
 
@@ -140,9 +138,14 @@
         <!-- TAB 2: LỊCH PASTEL iOS -->
         <div id="view-deadlines" class="section-view">
             <div class="calendar-header">
-                <button class="btn-success" onclick="changeMonth(-1)">◀ Tháng trước</button>
-                <h2 id="calendar-month-title" style="margin: 0; color: var(--primary);">Tháng 10 2026</h2>
-                <button class="btn-success" onclick="changeMonth(1)">Tháng sau ▶</button>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button class="btn-success" onclick="changeMonth(-1)">◀ Tháng trước</button>
+                    <h2 id="calendar-month-title" style="margin: 0; color: var(--primary);">Tháng 10 2026</h2>
+                    <button class="btn-success" onclick="changeMonth(1)">Tháng sau ▶</button>
+                </div>
+                <div>
+                    <button class="btn-warning" onclick="exportCalendarICS()">📲 Thêm vào Lịch Điện Thoại (.ics)</button>
+                </div>
             </div>
 
             <div class="calendar-grid">
@@ -462,7 +465,6 @@
                 let isToday = (dateKey === todayStr);
                 let matchedDeadlines = allDeadlines.filter(d => (d.deadline_time || '').startsWith(dateKey));
 
-                // Bôi màu nền ô Pastel và hiện chấm tròn nếu có sự kiện
                 if (matchedDeadlines.length > 0) {
                     cell.className = 'calendar-cell has-events';
                 } else {
@@ -472,7 +474,6 @@
                 let dayNumClass = isToday ? "calendar-day-num today" : "calendar-day-num";
                 let dotsHtml = matchedDeadlines.length > 0 ? `<div class="event-dots"><div class="event-dot"></div></div>` : '';
 
-                // Bấm vào mở popup xem chi tiết từng môn riêng biệt
                 cell.onclick = () => openEventModal(dateKey, matchedDeadlines);
 
                 cell.innerHTML = `
@@ -483,7 +484,6 @@
             }
         }
 
-        // Mở popup liệt kê toàn bộ sự kiện của từng môn, không bị gộp mất
         function openEventModal(dateStr, deadlines) {
             document.getElementById('modal-date-title').innerText = `📅 Sự kiện ngày ${dateStr.split('-').reverse().join('/')}`;
             const listContainer = document.getElementById('modal-events-list');
@@ -512,6 +512,49 @@
 
         function closeEventModal() {
             document.getElementById('event-modal').style.display = 'none';
+        }
+
+        // Xuất file iCal (.ics) có kèm báo thức nhắc nhở trước 1 ngày cho điện thoại
+        function exportCalendarICS() {
+            if (!allDeadlines || allDeadlines.length === 0) {
+                alert("Chưa có sự kiện deadline nào để đồng bộ!");
+                return;
+            }
+
+            let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//HOU LMS Smart Hub//VN\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n";
+
+            allDeadlines.forEach(d => {
+                if (!d.deadline_time) return;
+                let dateStr = d.deadline_time.replace(/-/g, ''); 
+                icsContent += "BEGIN:VEVENT\n";
+                icsContent += `UID:${d.id || Math.random()}\n`;
+                icsContent += `DTSTAMP:${dateStr}T000000Z\n`;
+                icsContent += `DTSTART;VALUE=DATE:${dateStr}\n`;
+                icsContent += `DTEND;VALUE=DATE:${dateStr}\n`;
+                icsContent += `SUMMARY:[${d.course || 'HOU'}] ${d.title}\n`;
+                
+                // Cài đặt báo thức nhắc trước 1 ngày (-P1D)
+                icsContent += "BEGIN:VALARM\n";
+                icsContent += "TRIGGER:-P1DT15H\n";
+                icsContent += "ACTION:DISPLAY\n";
+                icsContent += `DESCRIPTION:Nhắc nhở deadline: ${d.title}\n`;
+                icsContent += "END:VALARM\n";
+
+                if (d.url) {
+                    icsContent += `DESCRIPTION:Link làm bài: ${d.url}\n`;
+                    icsContent += `URL:${d.url}\n`;
+                }
+                icsContent += "END:VEVENT\n";
+            });
+
+            icsContent += "END:VCALENDAR";
+
+            let blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = `HOU_Deadlines_SmartHub.ics`;
+            a.click();
         }
 
         async function importJSON(event) {
