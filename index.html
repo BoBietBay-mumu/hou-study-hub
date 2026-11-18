@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HOU LMS Smart Hub - Lịch Pastel iOS & Điện Thoại</title>
+    <title>HOU LMS Smart Hub</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #007aff; --success: #34c759; --danger: #ff3b30; --warning: #ffcc00; --bg: #f2f2f7; }
@@ -76,7 +76,7 @@
 <body>
     <div class="container">
         <h1>
-            📚 HOU LMS Smart Hub (Lịch Pastel iOS)
+            📚 HOU LMS Smart Hub
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <input type="file" id="json-file-input" style="display: none;" accept=".json" onchange="importJSON(event)">
                 <button class="btn-warning" onclick="document.getElementById('json-file-input').click()">📥 Nhập JSON</button>
@@ -87,7 +87,7 @@
 
         <div class="main-nav">
             <button class="nav-tab active" onclick="switchMainTab('questions')">📖 Ngân Hàng Câu Hỏi</button>
-            <button class="nav-tab" onclick="switchMainTab('deadlines')">📅 Lịch & Deadlines (Pastel iOS)</button>
+            <button class="nav-tab" onclick="switchMainTab('deadlines')">📅 Lịch & Deadlines</button>
         </div>
 
         <!-- TAB 1: NGÂN HÀNG CÂU HỎI -->
