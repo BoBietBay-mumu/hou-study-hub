@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HOU LMS Smart Hub</title>
+    <title>HOU LMS Smart Hub - Lịch Pastel iOS & Điện Thoại</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #007aff; --success: #34c759; --danger: #ff3b30; --warning: #ffcc00; --bg: #f2f2f7; }
@@ -76,7 +76,7 @@
 <body>
     <div class="container">
         <h1>
-            📚 HOU LMS Smart Hub
+            📚 HOU LMS Smart Hub (Lịch Pastel iOS)
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <input type="file" id="json-file-input" style="display: none;" accept=".json" onchange="importJSON(event)">
                 <button class="btn-warning" onclick="document.getElementById('json-file-input').click()">📥 Nhập JSON</button>
@@ -87,7 +87,7 @@
 
         <div class="main-nav">
             <button class="nav-tab active" onclick="switchMainTab('questions')">📖 Ngân Hàng Câu Hỏi</button>
-            <button class="nav-tab" onclick="switchMainTab('deadlines')">📅 Lịch & Deadlines</button>
+            <button class="nav-tab" onclick="switchMainTab('deadlines')">📅 Lịch & Deadlines (Pastel iOS)</button>
         </div>
 
         <!-- TAB 1: NGÂN HÀNG CÂU HỎI -->
@@ -182,14 +182,15 @@
         let activeSubjectData = { correct: {}, wrong: {} }; 
         let activeSubject = '';
         let currentQuestionTab = 'correct';
-        let semesters = JSON.parse(localStorage.getItem('hou_semesters') || '["Kỳ 1", "Kỳ 2", "Kỳ 3"]');
+        
+        // Quản lý danh sách kỳ học lưu trên localStorage (có đồng bộ dự phòng)
+        let semesters = JSON.parse(localStorage.getItem('hou_semesters') || '["Kỳ 1", "Kỳ 1 2026", "Kỳ 2"]');
         let subjectSemesterMap = JSON.parse(localStorage.getItem('hou_subject_map') || '{}');
         
         let allDeadlines = [];
         let currentCalendarYear = new Date().getFullYear();
         let currentCalendarMonth = new Date().getMonth();
 
-        // LẮNG NGHE SỰ KIỆN NÚT BACK / FORWARD CỦA TRÌNH DUYỆT
         window.addEventListener('popstate', (event) => {
             handleRoute();
         });
@@ -253,12 +254,36 @@
         }
 
         function addNewSemester() {
-            let name = document.getElementById('new-semester-name').value.trim();
-            if (!name) return;
+            let inputEl = document.getElementById('new-semester-name');
+            let name = inputEl.value.trim();
+            if (!name) {
+                alert("Vui lòng nhập tên kỳ học vào ô trống trước khi thêm!");
+                return;
+            }
             if (!semesters.includes(name)) {
                 semesters.push(name);
                 localStorage.setItem('hou_semesters', JSON.stringify(semesters));
-                document.getElementById('new-semester-name').value = '';
+                inputEl.value = '';
+                renderDirectory();
+                alert(`✨ Đã thêm kỳ học [${name}] thành công!`);
+            } else {
+                alert("Tên kỳ học này đã tồn tại rồi!");
+            }
+        }
+
+        function deleteSemester(semName) {
+            if (semName === "Kỳ 1" || semName === "Chưa phân kỳ") {
+                alert("Không thể xóa kỳ mặc định này!");
+                return;
+            }
+            if (confirm(`Bạn có chắc muốn xóa kỳ [${semName}]? Các môn trong kỳ này sẽ được chuyển về mục Chưa phân kỳ.`)) {
+                semesters = semesters.filter(s => s !== semName);
+                localStorage.setItem('hou_semesters', JSON.stringify(semesters));
+                // Cập nhật lại map môn học
+                for (let [sub, sem] of Object.entries(subjectSemesterMap)) {
+                    if (sem === semName) delete subjectSemesterMap[sub];
+                }
+                localStorage.setItem('hou_subject_map', JSON.stringify(subjectSemesterMap));
                 renderDirectory();
             }
         }
@@ -296,10 +321,14 @@
             }
 
             for (let [sem, list] of Object.entries(grouped)) {
-                if (list.length === 0 && sem !== "Kỳ 1") continue;
+                if (list.length === 0 && sem !== "Kỳ 1" && semesters.length > 1) continue;
                 let semBox = document.createElement('div');
                 semBox.className = 'semester-box';
-                semBox.innerHTML = `<div class="semester-title">📂 ${sem}</div>`;
+                
+                let deleteSemBtn = (sem !== "Kỳ 1" && sem !== "Chưa phân kỳ") ? 
+                    `<button class="btn-danger" style="padding: 2px 8px; font-size: 11px;" onclick="deleteSemester('${sem}')">Xóa Kỳ Này</button>` : '';
+
+                semBox.innerHTML = `<div class="semester-title">📂 ${sem} ${deleteSemBtn}</div>`;
                 let grid = document.createElement('div');
                 grid.className = 'subject-grid';
 
@@ -322,7 +351,6 @@
             }
         }
 
-        // Khi người dùng bấm vào môn học -> đẩy vào lịch sử trình duyệt
         function selectSubject(subName) {
             window.location.hash = `subject=${encodeURIComponent(subName)}`;
         }
@@ -658,7 +686,6 @@
             a.click();
         }
 
-        // Khởi chạy ban đầu: kiểm tra xem URL có đang đứng ở môn nào không để load thẳng vào môn đó
         if (window.location.hash.startsWith('#subject=')) {
             handleRoute();
         } else {
